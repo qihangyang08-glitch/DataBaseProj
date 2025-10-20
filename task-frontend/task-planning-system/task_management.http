@@ -1,0 +1,208 @@
+### ===================================================================
+### 任务管理模块 - API集成测试脚本
+### ===================================================================
+
+### --- 全局变量定义 ---
+# !!! 前置准备：请在这里手动粘贴 班级管理员(如testuser) 的JWT Token !!!
+@admin_jwt_token = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlciIsImlhdCI6MTc1NzI0NDk1NCwiZXhwIjoxNzU3MzMxMzU0fQ.EWauJi3qE_WfSl50Z-B5InKliB5hs3N2-1fDIOK4Qtk
+# !!! 前置准备：请在这里手动粘贴 普通班级成员(如testuser2) 的JWT Token !!!
+@member_jwt_token = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlckIiLCJpYXQiOjE3NTczMjU4NTksImV4cCI6MTc1NzQxMjI1OX0.lw_-GANNvcxbmi4D9uX6va401JmNpKU1lR99Lkc2__8
+# !!! 假设班级ID为1，请根据你实际创建的班级ID修改 !!!
+@classId = 3
+
+
+### ===================================================================
+### 1. 个人任务管理 (使用管理员Token测试)
+### ===================================================================
+
+### 1.1 创建个人任务 - 成功
+# @name createPersonalTask
+POST http://localhost:8080/api/tasks/personal
+Authorization: {{member_jwt_token}}
+Content-Type: application/json
+
+{
+  "title": "成员个人任务",
+  "description": "这是成员的个人任务",
+  "courseName": "计网",
+  "deadline": "2025-10-10T23:59:00"
+}
+
+###
+
+### 1.2 (暂存) 获取新创建的个人任务ID
+@personalTaskId = 15
+
+###
+
+### 1.3 创建个人任务 - 数据校验失败 (标题为空)
+POST http://localhost:8080/api/tasks/personal
+Authorization: {{member_jwt_token}}
+Content-Type: application/json
+
+{
+  "title": "",
+  "description": "这是一个无效的请求",
+  "deadline": "2025-10-15T23:59:00"
+}
+
+###
+
+### 1.4 获取个人任务列表 (分页)
+GET http://localhost:8080/api/tasks/personal?page=0&size=10
+Authorization: {{member_jwt_token}}
+
+
+### ===================================================================
+### 2. 班级任务管理
+### ===================================================================
+
+### 2.1 创建班级任务 - 成功 (由管理员创建)
+# @name createClassTask
+POST http://localhost:8080/api/classes/{{classId}}/tasks
+Authorization: {{admin_jwt_token}}
+Content-Type: application/json
+
+{
+  "title": "管理员创建班级任务",
+  "description": "完成教材第8-12章的综合练习题。",
+  "courseName": "数据结构",
+  "deadline": "2025-10-20T23:59:00"
+}
+
+###
+
+### 2.2 (暂存) 获取新创建的班级任务ID
+@classTaskId = 14
+
+###
+
+### 2.3 创建班级任务 - 权限不足 (由普通成员尝试创建)
+POST http://localhost:8080/api/classes/{{classId}}/tasks
+Authorization: {{member_jwt_token}}
+Content-Type: application/json
+
+{
+  "title": "我是一个普通成员，我来试试创建任务",
+  "description": "完成教材第8-12章的综合练习题。",
+  "courseName": "数据结构",
+  "deadline": "2025-10-20T23:59:00"
+}
+
+###
+
+### 2.4 获取班级任务列表 (分页)
+GET http://localhost:8080/api/classes/{{classId}}/tasks?page=0&size=10
+Authorization: {{member_jwt_token}}
+
+
+### ===================================================================
+### 3. 任务状态与交互
+### ===================================================================
+
+### 3.1 更新个人任务状态 - 标记为完成
+PUT http://localhost:8080/api/tasks/{{personalTaskId}}/status
+Authorization: {{member_jwt_token}}
+Content-Type: application/json
+
+{
+  "status": "DONE",
+  "personalNotes": "修改成员个人任务状态为DONE"
+}
+
+###
+
+### 3.2 更新班级任务状态 - 设置个人截止时间 (作为普通成员)
+PUT http://localhost:8080/api/tasks/{{classTaskId}}/status
+Authorization: {{member_jwt_token}}
+Content-Type: application/json
+
+{
+  "status": "IN_PROGRESS",
+  "personalDeadline": "2025-10-19T20:00:00",
+  "personalNotes": "提前一天完成，成员设置班级任务截止日期"
+}
+
+
+### ===================================================================
+### 4. 核心视图与查询
+### ===================================================================
+
+### 4.1 获取日历视图数据 (作为普通成员)
+# 应该能看到自己的个人任务(如果用admin token)和已导入的班级任务
+GET http://localhost:8080/api/calendar?year=2025&month=10
+Authorization: {{member_jwt_token}}
+
+###
+
+### 4.2 获取任务详情 - 个人任务
+GET http://localhost:8080/api/tasks/{{personalTaskId}}
+Authorization: {{member_jwt_token}}
+
+###
+
+### 4.3 获取任务详情 - 班级任务
+GET http://localhost:8080/api/tasks/{{classTaskId}}
+Authorization: {{member_jwt_token}}
+
+
+### ===================================================================
+### 5. 任务修改与删除 (权限测试)
+### ===================================================================
+
+### 5.1 修改自己的个人任务 - 成功
+PUT http://localhost:8080/api/tasks/{{personalTaskId}}
+Authorization: {{member_jwt_token}}
+Content-Type: application/json
+
+{
+  "title": "修改成员个人任务",
+  "courseName": "计网",
+  "deadline": "2025-10-17T23:59:00"
+}
+
+###
+
+### 5.2 修改班级任务 - 权限不足 (普通成员尝试修改)
+PUT http://localhost:8080/api/tasks/{{classTaskId}}
+Authorization: {{member_jwt_token}}
+Content-Type: application/json
+
+{
+  "title": "我来试试修改班级任务的标题",
+  "courseName": "数据结构",
+  "deadline": "2025-10-25T23:59:00"
+}
+
+###
+
+### 5.3 删除自己的个人任务 - 成功
+DELETE http://localhost:8080/api/tasks/{{personalTaskId}}
+Authorization: {{member_jwt_token}}
+
+###
+
+### 5.4 删除班级任务 - 权限足 (管理员删除)
+DELETE http://localhost:8080/api/tasks/{{classTaskId}}
+Authorization: {{member_jwt_token}}
+
+
+### ===================================================================
+### 6. 错误与边界情况测试
+### ===================================================================
+
+### 6.1 访问不存在的任务
+GET http://localhost:8080/api/tasks/99999
+Authorization: {{member_jwt_token}}
+
+###
+
+### 6.2 (需要额外准备数据) 访问他人创建的个人任务
+# 假设存在一个ID为100的，由其他用户创建的个人任务
+GET http://localhost:8080/api/tasks/4
+Authorization: {{member_jwt_token}}
+
+###
+
+### 6.3 未认证访问需要权限的接口
+GET http://localhost:8080/api/calendar?year=2025&month=10

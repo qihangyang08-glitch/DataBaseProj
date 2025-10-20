@@ -1,0 +1,107 @@
+### ===================================================================
+### 03 - 任务管理与智能同步测试
+###
+### 前置条件: 必须先运行 01 和 02 脚本并填充好环境文件
+### ===================================================================
+
+### 1. 管理员(admin)在班级1创建任务
+# @name createTaskInClass1
+POST {{host}}/api/classes/{{class1_id}}/tasks
+Authorization: {{admin_token}}
+Content-Type: application/json
+
+{
+  "title": "新任务：完成第三章",
+  "courseName": "软件工程",
+  "deadline": "2025-10-10T23:59:00"
+}
+
+###
+@task1_id = 20
+###
+
+### 2. 普通成员(memberA)尝试在班级1创建任务 (预期失败, 403 Forbidden)
+POST {{host}}/api/classes/{{class1_id}}/tasks
+Authorization: {{memberA_token}}
+Content-Type: application/json
+
+{ "title": "这是一个不该成功的任务",
+  "courseName": "软件工程",
+  "deadline": "2025-10-15T23:59:00"
+}
+
+###
+
+### 3. 成员A查看日历 (同步前, 应该看不到班级任务)
+GET {{host}}/api/calendar?year=2025&month=10
+Authorization: {{memberA_token}}
+
+###
+### 4 成员A创建个人任务
+# @name createPersonalTask
+POST {{host}}/api/tasks/personal
+Authorization: {{memberA_token}}
+Content-Type: application/json
+
+{
+  "title": "成员A个人任务",
+  "description": "这是成员A的个人任务",
+  "courseName": "计网",
+  "deadline": "2025-10-10T23:59:00"
+}
+
+###
+### 5. 成员A再次查看日历
+GET {{host}}/api/calendar?year=2025&month=10
+Authorization: {{memberA_token}}
+
+###
+
+### 6. 成员A同步班级1的任务（范围为月）
+POST {{host}}/api/sync/class/{{class1_id}}?range=month
+Authorization: {{memberA_token}}
+
+###
+
+### 5. 成员A再次查看日历 (同步后, 应该能看到班级任务了)
+GET {{host}}/api/calendar?year=2025&month=10
+Authorization: {{memberA_token}}
+
+###
+#截至目前：成员A有一个个人任务，class1有一个班级任务1，成员A已导入改班级任务
+
+### 6. 成员A更新班级任务的个人状态
+PUT {{host}}/api/tasks/{{task1_id}} /status
+Authorization: {{memberA_token}}
+Content-Type: application/json
+
+{
+"status": "IN_PROGRESS",
+"personalDeadline": "2024-12-25T23:59:59",
+"personalNotes": "我的个人备注"
+}
+###
+
+### 7.管理员更新班级任务的截止日期2025-10-15T23:59:00->2025-10-20T23:59:00
+PUT {{host}}/api/tasks/{{task1_id}}
+Authorization: {{admin_token}}
+Content-Type: application/json
+
+{
+  "description": "更新后的描述",
+  "deadline": "2025-10-20T23:59:59",
+  "title": "完成第一章：软件工程概论",
+  "courseName": "软件工程"
+}
+###
+
+### 8. 成员A查看日历，确认班级任务日期是否同步改变
+GET {{host}}/api/calendar?year=2025&month=10
+Authorization: {{memberA_token}}
+
+###
+# Assistant note:
+# 我已读取并理解 task-planning-system 中的后端 API 用例（包括 01/02/03 脚本）。
+# 等待你的第一个具体前端开发任务（例如：将 App.jsx 拆分成组件、路由重构、状态管理改造、补全某个具体功能等）。
+# 请在下一条消息中明确指定要我实现的第一个具体任务（包括期望的输出文件/修改范围、技术约束和优先级）。
+# 该注释不会影响任何现有请求示例或自动化测试。

@@ -1,0 +1,44 @@
+### 1. 注册一个新用户
+# @name registerRequest
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuserB",
+  "email": "testuserB@example.com",
+  "password": "password123",
+  "displayName": "测试用户2",
+  "name": "杨帆",
+  "phone": "15665277175"
+}
+
+### 分隔符，用于分隔不同的请求
+###
+
+### 2. 使用正确的凭据登录
+# @name loginRequest
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuserB",
+  "password": "password123"
+}
+
+###
+
+### 3. 使用错误的密码登录 (预期失败)
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "wrongpassword"
+}
+
+###
+
+### 4. 获取当前用户信息 (需要认证)
+# @name getCurrentUserRequest
+GET http://localhost:8080/api/users/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlciIsImlhdCI6MTc1NzIzNjkyOSwiZXhwIjoxNzU3MzIzMzI5fQ.0LRxH6KA-zXye8dHuGW1gcfyEWwdaqeFYKnBUKRC7p0

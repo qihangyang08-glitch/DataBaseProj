@@ -1,0 +1,4642 @@
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ApiResponse.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ --- 
+// 2. 统一响应格式 (ApiResponse.java)
+package com.example.taskplanning;
+
+import java.time.LocalDateTime;
+
+public class ApiResponse<T> {
+
+    private boolean success;
+    private T data;
+    private String message;
+    private String error;
+    private int code;
+    private LocalDateTime timestamp;
+
+    // 私有构造函数
+    private ApiResponse() {
+        this.timestamp = LocalDateTime.now();
+    }
+
+    // 成功响应静态方法
+    public static <T> ApiResponse<T> success(T data, String message) {
+        ApiResponse<T> response = new ApiResponse<>();
+        response.success = true;
+        response.data = data;
+        response.message = message;
+        response.code = 200;
+        return response;
+    }
+
+    public static <T> ApiResponse<T> success(String message) {
+        return success(null, message);
+    }
+
+    // 错误响应静态方法
+    public static <T> ApiResponse<T> error(String error, String message, int code) {
+        ApiResponse<T> response = new ApiResponse<>();
+        response.success = false;
+        response.error = error;
+        response.message = message;
+        response.code = code;
+        return response;
+    }
+
+    // Getter和Setter方法
+    public boolean isSuccess() { return success; }
+    public void setSuccess(boolean success) { this.success = success; }
+
+    public T getData() { return data; }
+    public void setData(T data) { this.data = data; }
+
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
+
+    public String getError() { return error; }
+    public void setError(String error) { this.error = error; }
+
+    public int getCode() { return code; }
+    public void setCode(int code) { this.code = code; }
+
+    public LocalDateTime getTimestamp() { return timestamp; }
+    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\JwtAuthenticationFilter.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ --- 
+// JwtAuthenticationFilter.java (V2.0 - 重构版)
+package com.example.taskplanning;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+import java.io.IOException;
+
+@Component
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
+    private final JwtTokenProvider tokenProvider;
+    private final UserDetailsService userDetailsService; // <-- 2. 注入官方的UserDetailsService接口
+
+    @Autowired
+    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider, UserDetailsService userDetailsService) {
+        this.tokenProvider = tokenProvider;
+        this.userDetailsService = userDetailsService;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+
+        try {
+            String jwt = getJwtFromRequest(request);
+
+            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+                String username = tokenProvider.getUsernameFromJWT(jwt); // 假设tokenProvider有这个方法
+
+                // 3. 使用UserDetailsService加载完整的、Spring Security认可的UserDetails
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                // 4. 用这个完整的UserDetails来创建认证对象
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                // 5. 设置到上下文中
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
+        } catch (Exception ex) {
+            logger.error("Could not set user authentication in security context", ex);
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private String getJwtFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\JwtTokenProvider.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ --- 
+package com.example.taskplanning;
+
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SecurityException; // 明确导入正确的SecurityException
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+import javax.crypto.SecretKey;
+import java.util.Date;
+
+@Component
+public class JwtTokenProvider {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtTokenProvider.class);
+
+    @Value("${app.jwt.secret}")
+    private String jwtSecret;
+
+    @Value("${app.jwt.expiration-in-ms}")
+    private long jwtExpirationInMs; // 使用基本类型 long 更好
+
+    private SecretKey getSigningKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(this.jwtSecret);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    /**
+     * 【核心改动】
+     * 根据Spring Security的Authentication对象生成JWT Token.
+     * 这是最标准的做法，因为它能从认证成功的结果中直接获取用户信息。
+     *
+     * @param authentication Spring Security认证成功的对象
+     * @return 生成的JWT Token字符串
+     */
+    public String generateToken(Authentication authentication) {
+        // 从Authentication对象中获取UserDetails，它包含了用户名等核心信息
+        UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+        String username = userPrincipal.getUsername();
+
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+
+        // 注意：如果你还想在Token中加入userId，需要让你的UserDetails实现类包含userId
+        // 这是一个更高级的实践，我们暂时只用username作为主体(Subject)
+        return Jwts.builder()
+                .setSubject(username)
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    /**
+     * 从JWT Token中提取用户名 (Subject)
+     *
+     * @param token JWT Token
+     * @return 用户名
+     */
+    public String getUsernameFromJWT(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        return claims.getSubject();
+    }
+
+    /**
+     * 验证JWT Token是否有效
+     *
+     * @param token JWT Token
+     * @return true如果Token有效
+     */
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parse(token);
+            return true;
+        } catch (SecurityException | MalformedJwtException ex) {
+            logger.error("Invalid JWT token: {}", ex.getMessage());
+        } catch (ExpiredJwtException ex) {
+            logger.error("Expired JWT token: {}", ex.getMessage());
+        } catch (UnsupportedJwtException ex) {
+            logger.error("Unsupported JWT token: {}", ex.getMessage());
+        } catch (IllegalArgumentException ex) {
+            logger.error("JWT claims string is empty: {}", ex.getMessage());
+        }
+        return false;
+    }
+
+    /**
+     * 获取JWT过期时间（毫秒）
+     */
+    public long getJwtExpirationInMs() {
+        return jwtExpirationInMs;
+    }
+
+    // --- (以下方法在当前重构后的流程中不是必需的，但可以保留) ---
+
+    public Long getUserIdFromToken(String token) {
+        // ... (原代码保持不变，但请注意，如果generateToken不存userId，这里会报错)
+        // 为了安全起见，我们暂时注释掉它，因为新版generateToken没存userId
+        /*
+        Claims claims = Jwts.parserBuilder()...
+        return claims.get("userId", Long.class);
+        */
+        throw new UnsupportedOperationException("UserId is not included in the JWT token in this version.");
+    }
+
+    public Date getExpirationDateFromToken(String token) {
+        // ... (原代码保持不变) ...
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.getExpiration();
+    }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\TaskPlanningSystemApplication.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ --- 
+package com.example.taskplanning;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class TaskPlanningSystemApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(TaskPlanningSystemApplication.class, args);
+    }
+
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\annotation\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\annotation\LogAction.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\annotation\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\annotation\ --- 
+package com.example.taskplanning.annotation;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.METHOD})
+public @interface LogAction {
+    String action();
+    String entityType() default "";
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\annotation\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\aop\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\aop\LoggingAspect.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\aop\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\aop\ --- 
+package com.example.taskplanning.aop;
+
+import com.example.taskplanning.annotation.LogAction;
+import com.example.taskplanning.entity.ActionLog;
+import com.example.taskplanning.entity.User;
+import com.example.taskplanning.service.LogService;
+import com.example.taskplanning.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.reflect.MethodSignature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
+
+@Aspect
+@Component
+public class LoggingAspect {
+
+    private static final Logger logger = LoggerFactory.getLogger(LoggingAspect.class);
+
+    private final LogService logService;
+    private final UserService userService;
+
+    @Autowired
+    public LoggingAspect(LogService logService, UserService userService) {
+        this.logService = logService;
+        this.userService = userService;
+    }
+
+    @AfterReturning(pointcut = "@annotation(com.example.taskplanning.annotation.LogAction)", returning = "result")
+    public void afterReturning(JoinPoint joinPoint, Object result) {
+        try {
+            MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+            Method method = signature.getMethod();
+            LogAction logAction = method.getAnnotation(LogAction.class);
+            if (logAction == null) return;
+
+            String action = logAction.action();
+            String entityType = logAction.entityType();
+
+            Long entityId = extractEntityId(joinPoint.getArgs(), result);
+
+            String ip = null;
+            String userAgent = null;
+            RequestAttributes reqAttr = RequestContextHolder.getRequestAttributes();
+            if (reqAttr instanceof ServletRequestAttributes) {
+                HttpServletRequest request = ((ServletRequestAttributes) reqAttr).getRequest();
+                if (request != null) {
+                    ip = request.getRemoteAddr();
+                    userAgent = request.getHeader("User-Agent");
+                }
+            }
+
+            User currentUser = null;
+            try {
+                currentUser = userService.getCurrentUserEntity();
+            } catch (Exception ignored) {}
+
+            Map<String, Object> detailsMap = new HashMap<>();
+            detailsMap.put("method", method.getName());
+            detailsMap.put("args", buildArgMap(signature.getParameterNames(), joinPoint.getArgs()));
+            detailsMap.put("result", result);
+
+            String details = detailsMap.toString();
+
+            ActionLog actionLog = new ActionLog(currentUser, action, entityType, entityId, details, ip, userAgent);
+            logService.log(actionLog);
+        } catch (Throwable t) {
+            logger.error("LoggingAspect error", t);
+        }
+    }
+
+    private Map<String, Object> buildArgMap(String[] names, Object[] values) {
+        Map<String, Object> map = new HashMap<>();
+        if (names == null) return map;
+        for (int i = 0; i < names.length && i < values.length; i++) {
+            map.put(names[i], values[i]);
+        }
+        return map;
+    }
+
+    private Long extractEntityId(Object[] args, Object result) {
+        for (Object arg : args) {
+            if (arg instanceof Long) return (Long) arg;
+            try {
+                Method m = arg != null ? arg.getClass().getMethod("getId") : null;
+                if (m != null) {
+                    Object id = m.invoke(arg);
+                    if (id instanceof Long) return (Long) id;
+                }
+            } catch (Exception ignored) {}
+        }
+
+        if (result != null) {
+            try {
+                Method m = result.getClass().getMethod("getId");
+                Object id = m.invoke(result);
+                if (id instanceof Long) return (Long) id;
+            } catch (Exception ignored) {}
+        }
+
+        return null;
+    }
+
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\aop\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\AsyncConfig.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ --- 
+package com.example.taskplanning.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.Executor;
+
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+
+    @Bean("logTaskExecutor")
+    public Executor logTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(5);
+        executor.setQueueCapacity(500);
+        executor.setThreadNamePrefix("LogExecutor-");
+        executor.initialize();
+        return executor;
+    }
+
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\CustomUserDetails.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ --- 
+package com.example.taskplanning.config;
+
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.util.Collection;
+
+/**
+ * 自定义UserDetails实现
+ * 扩展标准UserDetails，添加用户ID属性
+ * 这样@PreAuthorize表达式就可以访问authentication.principal.id了
+ */
+public class CustomUserDetails implements UserDetails {
+
+    private final Long id;
+    private final String username;
+    private final String password;
+    private final Collection<? extends GrantedAuthority> authorities;
+
+    public CustomUserDetails(Long id, String username, String password,
+                             Collection<? extends GrantedAuthority> authorities) {
+        this.id = id;
+        this.username = username;
+        this.password = password;
+        this.authorities = authorities;
+    }
+
+    /**
+     * 获取用户ID
+     * 供@PreAuthorize表达式使用：authentication.principal.id
+     */
+    public Long getId() {
+        return id;
+    }
+
+    @Override
+    public String getUsername() {
+        return username;
+    }
+
+    @Override
+    public String getPassword() {
+        return password;
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return authorities;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\PasswordConfig.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ --- 
+// 8. 密码加密配置 (PasswordConfig.java)
+package com.example.taskplanning.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+@Configuration
+public class PasswordConfig {
+
+    @Bean
+    public BCryptPasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\SecurityConfig.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ --- 
+// SecurityConfig.java (V3.0 - 最终版)
+package com.example.taskplanning.config; // <-- 注意包名可能需要你改成自己的
+
+import com.example.taskplanning.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Autowired
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\config\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\AuthController.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ --- 
+// 7. 认证控制器 (AuthController.java)
+package com.example.taskplanning.controller;
+
+import com.example.taskplanning.dto.LoginRequestDto;
+import com.example.taskplanning.dto.LoginResponseDto;
+import lombok.extern.slf4j.Slf4j;
+
+import com.example.taskplanning.ApiResponse;
+import com.example.taskplanning.dto.UserRegistrationDto;
+import com.example.taskplanning.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
+
+@Slf4j
+@RestController
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = "*")
+public class AuthController {
+
+    @Autowired
+    private UserService userService;
+
+    /**
+     * 用户注册
+     */
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody UserRegistrationDto registrationDto) {
+
+        userService.registerUser(registrationDto);
+
+        ApiResponse<Void> response = ApiResponse.success("注册成功");
+        return ResponseEntity.ok(response);
+    }
+    /**
+     * 用户登录
+     *
+     * @param loginRequest 登录请求数据
+     * @return 登录结果（包含JWT Token）
+     */
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<LoginResponseDto>> loginUser(
+            @Valid @RequestBody LoginRequestDto loginRequest) {
+
+        log.info("收到用户登录请求: username={}", loginRequest.getUsername());
+
+        LoginResponseDto loginResponse = userService.loginUser(loginRequest);
+
+        log.info("用户登录成功: username={}", loginRequest.getUsername());
+
+        return ResponseEntity.ok(
+                ApiResponse.success(loginResponse, "登录成功")
+        );
+    }
+}
+
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ClassController.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ --- 
+// ClassController.java
+package com.example.taskplanning.controller;
+
+import com.example.taskplanning.dto.*;
+import com.example.taskplanning.ApiResponse;
+import com.example.taskplanning.entity.UserClassRelation;
+import com.example.taskplanning.exception.BusinessException;
+import com.example.taskplanning.service.ClassService;
+import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/classes")
+public class ClassController {
+
+    private final ClassService classService;
+
+    @Autowired
+    public ClassController(ClassService classService) {
+        this.classService = classService;
+    }
+
+    /**
+     * 创建班级
+     * POST /api/classes
+     */
+    @PostMapping
+    public ResponseEntity<ApiResponse<ClassResponseDto>> createClass(
+            @Valid @RequestBody ClassCreateDto createDto) {
+
+        ClassResponseDto classResponse = classService.createClass(createDto);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success(classResponse, "班级创建成功"));
+    }
+
+    /**
+     * 根据邀请码搜索班级
+     * GET /api/classes/search?inviteCode=ABC123XY
+     */
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<ClassResponseDto>> findClassByInviteCode(
+            @RequestParam("inviteCode") String inviteCode) {
+
+        ClassResponseDto classResponse = classService.findClassByInviteCode(inviteCode);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(classResponse, "班级查询成功")
+        );
+    }
+
+    /**
+     * 申请加入班级
+     * POST /api/classes/{classId}/join
+     */
+    @PostMapping("/{classId}/join")
+    public ResponseEntity<ApiResponse<String>> applyToJoinClass(
+            @PathVariable Long classId,
+            @Valid @RequestBody ClassJoinRequestDto joinRequestDto) {
+
+        classService.applyToJoinClass(classId, joinRequestDto);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("申请已提交，等待管理员审核", null)
+        );
+    }
+
+    /**
+     * 获取班级的待审批申请列表
+     * GET /api/classes/{classId}/approvals
+     * 需要ADMIN或OWNER权限
+     */
+    @GetMapping("/{classId}/approvals")
+    @PreAuthorize("@classService.hasClassAdminPermission(authentication.principal.id, #classId)")
+    public ResponseEntity<ApiResponse<Page<ApprovalResponseDto>>> getApprovalList(
+            @PathVariable Long classId,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+
+        Page<ApprovalResponseDto> approvalList = classService.getApprovalList(classId, pageable);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(approvalList, "待审批列表查询成功")
+        );
+    }
+
+    /**
+     * 处理申请审批
+     * PUT /api/classes/{classId}/approvals/{userId}
+     * 需要ADMIN或OWNER权限
+     */
+    @PutMapping("/{classId}/approvals/{userId}")
+    @PreAuthorize("@classService.hasClassAdminPermission(authentication.principal.id, #classId)")
+    public ResponseEntity<ApiResponse<String>> processApproval(
+            @PathVariable Long classId,
+            @PathVariable Long userId,
+            @Valid @RequestBody ApprovalActionDto approvalActionDto) {
+
+        String resultMessage = classService.processApproval(classId, userId, approvalActionDto);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(resultMessage, null)
+        );
+    }
+
+    /**
+     * 获取我加入的班级列表
+     * GET /api/classes/my
+     */
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<Page<ClassResponseDto>>> getMyClasses(
+            @PageableDefault(size = 20, sort = "joinedAt") Pageable pageable) {
+
+        Page<ClassResponseDto> myClasses = classService.getMyClasses(pageable);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(myClasses, "我的班级列表查询成功")
+        );
+    }
+    /**
+     * 变更班级成员角色 - 由Controller调用，已通过@PreAuthorize确保操作者为Owner
+     * @param classId 班级ID
+     * @param userId 要变更角色的用户ID
+     * @throws BusinessException 如果用户不存在、角色无效或尝试修改Owner
+     */
+    @PutMapping("/{classId}/members/{userId}/promote") //任命为管理员
+    @PreAuthorize("@securityService.isClassOwner(#classId)")
+    public ResponseEntity<ApiResponse<String>> promoteMemberToAdmin(
+            @PathVariable Long classId,
+            @PathVariable Long userId) {
+
+        // 2. 将具体角色作为参数，而不是DTO，传递给Service
+        classService.changeMemberRole(classId, userId, UserClassRelation.RoleInClass.ADMIN);
+
+        // 3. 不再需要try-catch，返回标准的ApiResponse
+        return ResponseEntity.ok(ApiResponse.success("成员已成功提升为管理员", null));
+    }
+
+    @PutMapping("/{classId}/members/{userId}/demote") // 剥夺管理员
+    @PreAuthorize("@securityService.isClassOwner(#classId)")
+    public ResponseEntity<ApiResponse<String>> demoteAdminToMember(
+            @PathVariable Long classId,
+            @PathVariable Long userId) {
+
+        classService.changeMemberRole(classId, userId, UserClassRelation.RoleInClass.MEMBER);
+
+        return ResponseEntity.ok(ApiResponse.success("管理员已成功降级为成员", null));
+    }
+
+    /**
+     * 检查用户在指定班级的权限
+     * GET /api/classes/{classId}/permission
+     * 这个接口用于前端判断用户是否有管理权限，决定是否显示管理功能
+     */
+    @GetMapping("/{classId}/permission")
+    public ResponseEntity<ApiResponse<Boolean>> checkClassPermission(
+            @PathVariable Long classId) {
+
+        boolean hasPermission = classService.checkClassPermission(classId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(hasPermission, "权限检查完成")
+        );
+    }
+    /**
+     * 获取指定班级的成员列表 (分页)
+     * 只有班级成员才能查看
+     *
+     * @param classId 班级ID
+     * @param pageable 分页参数
+     * @return 分页的成员列表
+     */
+    @GetMapping("/{classId}/members") // <-- 1. 核心: 匹配 GET /api/classes/{classId}/members
+    @PreAuthorize("@securityService.isClassMember(#classId)") // <-- 2. 权限: 只有班级成员才能看
+    public ResponseEntity<ApiResponse<Page<MemberResponseDto>>> getMemberList(
+            @PathVariable Long classId,
+            @PageableDefault(size = 20, sort = "joinedAt") Pageable pageable) {
+
+        // 3. 调用Service层完成业务逻辑
+        Page<MemberResponseDto> memberPage = classService.getMemberList(classId, pageable);
+
+        return ResponseEntity.ok(ApiResponse.success(memberPage, "成功获取班级成员列表"));
+    }
+    /**
+     * 获取当前用户在指定班级中的角色和权限信息
+     * GET /api/classes/{classId}/my-role
+     * 支持前端基于角色的UI条件渲染
+     */
+    @GetMapping("/{classId}/my-role")
+    @Operation(summary = "获取我在班级中的角色权限",
+            description = "获取当前登录用户在指定班级中的具体角色和权限信息，用于前端UI条件渲染")
+    public ResponseEntity<ApiResponse<UserRolePermissionResponseDto>> getMyRoleInClass(
+            @PathVariable Long classId) {
+
+        UserRolePermissionResponseDto rolePermission = classService.getUserRoleInClass(classId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(rolePermission, "角色权限查询成功")
+        );
+    }
+
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\SyncController.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ --- 
+package com.example.taskplanning.controller;
+
+import com.example.taskplanning.ApiResponse;
+import com.example.taskplanning.dto.SyncResultDto;
+import com.example.taskplanning.service.SyncService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+
+@RestController
+@RequestMapping("/api/sync")
+@Tag(name = "智能同步", description = "智能同步相关接口")
+public class SyncController {
+
+    @Autowired
+    private SyncService syncService;
+
+    /**
+     * 智能同步指定班级的任务到个人日历
+     * @param classId 班级ID
+     * @param range 时间范围 (day, week, month, semester, year)
+     * @return 同步结果
+     */
+    @PostMapping("/class/{classId}")
+    @PreAuthorize("@securityService.isClassMember(#classId)")
+    @Operation(summary = "智能同步班级任务",
+            description = "将指定班级在指定时间范围内的任务批量同步到用户的个人日历中")
+    public ApiResponse<SyncResultDto> syncClassTasks(
+            @PathVariable("classId")
+            @Parameter(description = "班级ID", required = true)
+            Long classId,
+
+            @RequestParam("range")
+            @NotBlank(message = "时间范围不能为空")
+            @Pattern(regexp = "^(day|week|month|semester|year)$",
+                    message = "时间范围只能是: day, week, month, semester, year")
+            @Parameter(description = "时间范围", required = true,
+                    example = "week")
+            String range) {
+
+        SyncResultDto result = syncService.syncClassTasks(classId, range);
+        return ApiResponse.success(result, "成功同步 " + result.getNewlySyncedTasks() + " 个任务");
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\TaskController.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ --- 
+// 10. TaskController.java - 任务控制器
+package com.example.taskplanning.controller;
+
+import com.example.taskplanning.ApiResponse;
+import com.example.taskplanning.dto.CalendarTaskDto;
+import com.example.taskplanning.dto.TaskCreateDto;
+import com.example.taskplanning.dto.TaskResponseDto;
+import com.example.taskplanning.dto.TaskStatusUpdateDto;
+import com.example.taskplanning.entity.Task;
+import com.example.taskplanning.entity.UserTaskRelation;
+import com.example.taskplanning.exception.BusinessException;
+import com.example.taskplanning.service.TaskService;
+import com.example.taskplanning.entity.User;
+import com.example.taskplanning.service.UserService;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api")
+public class TaskController {
+
+    private static final Logger logger = LoggerFactory.getLogger(TaskController.class);
+
+    private final TaskService taskService;
+
+    @Autowired
+    public TaskController(TaskService taskService) {
+        this.taskService = taskService;
+    }
+
+    /**
+     * 创建个人任务
+     */
+    @PostMapping("/tasks/personal")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<TaskResponseDto>> createPersonalTask(
+            @Valid @RequestBody TaskCreateDto createDto) {
+
+        TaskResponseDto task = taskService.createPersonalTask(createDto);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(task, "个人任务创建成功"));
+    }
+
+    /**
+     * 创建班级任务
+     */
+    @PostMapping("/classes/{classId}/tasks")
+    @PreAuthorize("@securityService.canManageClass(#classId)")
+    public ResponseEntity<ApiResponse<TaskResponseDto>> createClassTask(
+            @PathVariable Long classId,
+            @Valid @RequestBody TaskCreateDto createDto) {
+
+        TaskResponseDto task = taskService.createClassTask(classId, createDto);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(task, "班级任务创建成功"));
+    }
+
+    /**
+     * 获取日历视图数据
+     */
+    @GetMapping("/calendar")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<CalendarTaskDto>>> getCalendarTasks(
+            @RequestParam int year,
+            @RequestParam int month) {
+
+        List<CalendarTaskDto> tasks = taskService.getCalendarTasks(year, month);
+        return ResponseEntity.ok(ApiResponse.success(tasks, "日历数据获取成功"));
+    }
+
+    /**
+     * 获取班级任务列表
+     */
+    @GetMapping("/classes/{classId}/tasks")
+    @PreAuthorize("@securityService.isClassMember(#classId)")
+    public ResponseEntity<ApiResponse<Page<TaskResponseDto>>> getClassTasks(
+            @PathVariable Long classId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<TaskResponseDto> tasks = taskService.getClassTasks(classId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(tasks, "班级任务列表获取成功"));
+    }
+
+    /**
+     * 更新任务的个人状态
+     */
+    @PutMapping("/tasks/{taskId}/status")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<TaskResponseDto>> updateTaskStatus(
+            @PathVariable Long taskId,
+            @Valid @RequestBody TaskStatusUpdateDto statusUpdateDto) {
+
+        // Log incoming DTO for debugging personalDeadline issues
+        try {
+            logger.info("updateTaskStatus called for taskId={} status={} personalDeadline={}", taskId, statusUpdateDto.getStatus(), statusUpdateDto.getPersonalDeadline());
+        } catch (Exception e) {
+            logger.warn("Failed to log updateTaskStatus payload", e);
+        }
+
+        TaskResponseDto task = taskService.updateTaskStatus(taskId, statusUpdateDto);
+        logger.info("updateTaskStatus completed for taskId={}, returned personalDeadline={}", taskId, task.getPersonalDeadline());
+        return ResponseEntity.ok(ApiResponse.success(task, "任务状态更新成功"));
+    }
+
+    /**
+     * 获取任务详情
+     */
+    @GetMapping("/tasks/{taskId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<TaskResponseDto>> getTaskDetail(@PathVariable Long taskId) {
+        TaskResponseDto task = taskService.getTaskDetail(taskId);
+        return ResponseEntity.ok(ApiResponse.success(task, "任务详情获取成功"));
+    }
+    /**
+     * 获取个人任务列表
+     */
+    @GetMapping("/tasks/personal")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Page<TaskResponseDto>>> getPersonalTasks(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<TaskResponseDto> tasks = taskService.getPersonalTasks(pageable);
+        return ResponseEntity.ok(ApiResponse.success(tasks, "个人任务列表获取成功"));
+    }
+
+    /**
+     * 更新任务信息
+     */
+    @PutMapping("/tasks/{taskId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<TaskResponseDto>> updateTask(
+            @PathVariable Long taskId,
+            @Valid @RequestBody TaskCreateDto updateDto) {
+
+        TaskResponseDto task = taskService.updateTask(taskId, updateDto);
+        return ResponseEntity.ok(ApiResponse.success(task, "任务更新成功"));
+    }
+
+    /**
+     * 删除任务
+     */
+    @DeleteMapping("/tasks/{taskId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> deleteTask(@PathVariable Long taskId) {
+        taskService.deleteTask(taskId);
+        return ResponseEntity.ok(ApiResponse.success("任务删除成功"));
+    }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\UserController.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ --- 
+// UserController.java (V1.0 - 全新创建)
+package com.example.taskplanning.controller;
+
+import com.example.taskplanning.ApiResponse;
+import com.example.taskplanning.dto.UserResponseDto;
+import com.example.taskplanning.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/users") // <-- 这个Controller负责所有 /api/users 开头的路径
+@CrossOrigin(origins = "*")
+public class UserController {
+
+    private final UserService userService;
+
+    @Autowired
+    public UserController(UserService userService) {
+        this.userService = userService;
+    }
+
+    /**
+     * 获取当前登录用户的详细信息
+     * GET /api/users/me
+     *
+     * @return 包含脱敏后用户信息的ApiResponse
+     */
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()") // 确保只有已登录的用户才能访问
+    public ResponseEntity<ApiResponse<UserResponseDto>> getCurrentUser() {
+        // 调用Service层获取当前登录用户的DTO
+        UserResponseDto currentUserDto = userService.getCurrentUserDto();
+
+        // 使用ApiResponse包装成功响应
+        return ResponseEntity.ok(ApiResponse.success(currentUserDto, "Successfully fetched current user data."));
+    }
+
+    // 未来你可以在这里添加其他用户相关的API，比如：
+    // @PutMapping("/me")
+    // public ResponseEntity<ApiResponse<UserResponseDto>> updateCurrentUser(...) { ... }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\controller\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ApprovalActionDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// 3. ApprovalActionDto.java
+package com.example.taskplanning.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+
+public class ApprovalActionDto {
+
+    @NotBlank(message = "操作类型不能为空")
+    @Pattern(regexp = "^(APPROVE|REJECT)$", message = "操作类型只能是APPROVE或REJECT")
+    private String action;
+
+    // 构造函数
+    public ApprovalActionDto() {
+    }
+
+    public ApprovalActionDto(String action) {
+        this.action = action;
+    }
+
+    // Getters and Setters
+    public String getAction() {
+        return action;
+    }
+
+    public void setAction(String action) {
+        this.action = action;
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ApprovalResponseDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// 5. ApprovalResponseDto.java
+package com.example.taskplanning.dto;
+
+import com.example.taskplanning.entity.User;
+import com.example.taskplanning.entity.UserClassRelation;
+import java.time.LocalDateTime;
+
+public class ApprovalResponseDto {
+
+    private Long userId;
+    private String username;
+    private String displayName;
+    private String joinReason;
+    private LocalDateTime createdAt;
+
+    // 构造函数
+    public ApprovalResponseDto() {
+    }
+
+    // 便利构造函数，用于从UserClassRelation转换
+    public ApprovalResponseDto(UserClassRelation relation) {
+        User user = relation.getUser();
+        this.userId = user.getId();
+        this.username = user.getUsername();
+        this.displayName = user.getName();
+        this.joinReason = relation.getJoinReason();
+        this.createdAt = relation.getCreatedAt();
+    }
+
+    // Getters and Setters
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public String getJoinReason() {
+        return joinReason;
+    }
+
+    public void setJoinReason(String joinReason) {
+        this.joinReason = joinReason;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\CalendarTaskDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// 5. CalendarTaskDto.java - 日历视图任务DTO
+package com.example.taskplanning.dto;
+
+import com.example.taskplanning.entity.Task;
+import com.example.taskplanning.entity.UserTaskRelation;
+import java.time.LocalDateTime;
+
+public class CalendarTaskDto {
+
+    private Long id;
+    private String title;
+    private String courseName;
+    private Task.TaskType taskType;
+    private LocalDateTime deadline;
+    private LocalDateTime createdAt;
+
+    // 个人状态
+    private UserTaskRelation.TaskStatus personalStatus;
+    private LocalDateTime personalDeadline;
+
+    // 班级信息（如果是班级任务）
+    private String className;
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+
+    public String getCourseName() { return courseName; }
+    public void setCourseName(String courseName) { this.courseName = courseName; }
+
+    public Task.TaskType getTaskType() { return taskType; }
+    public void setTaskType(Task.TaskType taskType) { this.taskType = taskType; }
+
+    public LocalDateTime getDeadline() { return deadline; }
+    public void setDeadline(LocalDateTime deadline) { this.deadline = deadline; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public UserTaskRelation.TaskStatus getPersonalStatus() { return personalStatus; }
+    public void setPersonalStatus(UserTaskRelation.TaskStatus personalStatus) { this.personalStatus = personalStatus; }
+
+    public LocalDateTime getPersonalDeadline() { return personalDeadline; }
+    public void setPersonalDeadline(LocalDateTime personalDeadline) { this.personalDeadline = personalDeadline; }
+
+    public String getClassName() { return className; }
+    public void setClassName(String className) { this.className = className; }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ClassCreateDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// 1. ClassCreateDto.java
+package com.example.taskplanning.dto;
+
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+public class ClassCreateDto {
+
+    @NotBlank(message = "班级名称不能为空")
+    @Size(min = 1, max = 100, message = "班级名称长度必须在1-100个字符之间")
+    private String name;
+
+    @Size(max = 500, message = "描述长度不能超过500个字符")
+    private String description;
+
+    private boolean isPublic = true;
+
+    private boolean joinApprovalRequired = false;
+
+    // 构造函数
+    public ClassCreateDto() {
+    }
+
+    public ClassCreateDto(String name, String description, boolean isPublic, boolean joinApprovalRequired) {
+        this.name = name;
+        this.description = description;
+        this.isPublic = isPublic;
+        this.joinApprovalRequired = joinApprovalRequired;
+    }
+
+    // Getters and Setters
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public boolean isPublic() {
+        return isPublic;
+    }
+
+    public void setPublic(boolean isPublic) {
+        this.isPublic = isPublic;
+    }
+
+    public boolean isJoinApprovalRequired() {
+        return joinApprovalRequired;
+    }
+
+    public void setJoinApprovalRequired(boolean joinApprovalRequired) {
+        this.joinApprovalRequired = joinApprovalRequired;
+    }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ClassJoinRequestDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// 2. ClassJoinRequestDto.java
+package com.example.taskplanning.dto;
+
+import jakarta.validation.constraints.Size;
+
+public class ClassJoinRequestDto {
+
+    @Size(max = 500, message = "申请理由长度不能超过500个字符")
+    private String joinReason;
+
+    // 构造函数
+    public ClassJoinRequestDto() {
+    }
+
+    public ClassJoinRequestDto(String joinReason) {
+        this.joinReason = joinReason;
+    }
+
+    // Getters and Setters
+    public String getJoinReason() {
+        return joinReason;
+    }
+
+    public void setJoinReason(String joinReason) {
+        this.joinReason = joinReason;
+    }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ClassResponseDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// 4. ClassResponseDto.java
+package com.example.taskplanning.dto;
+
+import com.example.taskplanning.entity.Classes;
+import com.example.taskplanning.entity.User;
+import java.time.LocalDateTime;
+
+public class ClassResponseDto {
+
+    private Long id;
+    private String name;
+    private String description;
+    private String inviteCode;
+    private boolean isPublic;
+    private boolean joinApprovalRequired;
+    private LocalDateTime createdAt;
+    private UserSimpleDto owner;
+
+    // 构造函数
+    public ClassResponseDto() {
+    }
+
+    // 便利构造函数，用于从Entity转换
+    public ClassResponseDto(Classes classEntity, User owner) {
+        this.id = classEntity.getId();
+        this.name = classEntity.getName();
+        this.description = classEntity.getDescription();
+        this.inviteCode = classEntity.getInviteCode();
+        this.isPublic = classEntity.isPublic();
+        this.joinApprovalRequired = classEntity.isJoinApprovalRequired();
+        this.createdAt = classEntity.getCreatedAt();
+        this.owner = new UserSimpleDto(owner.getId(), owner.getUsername(), owner.getName());
+    }
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getInviteCode() {
+        return inviteCode;
+    }
+
+    public void setInviteCode(String inviteCode) {
+        this.inviteCode = inviteCode;
+    }
+
+    public boolean isPublic() {
+        return isPublic;
+    }
+
+    public void setPublic(boolean isPublic) {
+        this.isPublic = isPublic;
+    }
+
+    public boolean isJoinApprovalRequired() {
+        return joinApprovalRequired;
+    }
+
+    public void setJoinApprovalRequired(boolean joinApprovalRequired) {
+        this.joinApprovalRequired = joinApprovalRequired;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public UserSimpleDto getOwner() {
+        return owner;
+    }
+
+    public void setOwner(UserSimpleDto owner) {
+        this.owner = owner;
+    }
+
+    // 内部类：简化的用户信息DTO
+    public static class UserSimpleDto {
+        private Long id;
+        private String username;
+        private String displayName;
+
+        public UserSimpleDto() {
+        }
+
+        public UserSimpleDto(Long id, String username, String displayName) {
+            this.id = id;
+            this.username = username;
+            this.displayName = displayName;
+        }
+
+        // Getters and Setters
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public void setDisplayName(String displayName) {
+            this.displayName = displayName;
+        }
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\LoginRequestDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+package com.example.taskplanning.dto;
+
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+/**
+ * 用户登录请求DTO
+ */
+public class LoginRequestDto {
+
+    @NotBlank(message = "用户名不能为空")
+    @Size(min = 3, max = 20, message = "用户名长度必须在3-20个字符之间")
+    private String username;
+
+    @NotBlank(message = "密码不能为空")
+    @Size(min = 6, max = 20, message = "密码长度必须在6-20个字符之间")
+    private String password;
+
+    // 无参构造函数
+    public LoginRequestDto() {}
+
+    // 全参构造函数
+    public LoginRequestDto(String username, String password) {
+        this.username = username;
+        this.password = password;
+    }
+
+    // Getter和Setter方法
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    @Override
+    public String toString() {
+        return "LoginRequestDto{" +
+                "username='" + username + '\'' +
+                ", password='[PROTECTED]'" + // 出于安全考虑，不在toString中显示密码
+                '}';
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\LoginResponseDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+package com.example.taskplanning.dto;
+
+
+/**
+ * 用户登录响应DTO
+ */
+public class LoginResponseDto {
+
+    private String accessToken;
+    private String tokenType;
+    private Long expiresIn;
+
+    // 无参构造函数
+    public LoginResponseDto() {}
+
+    // 全参构造函数
+    public LoginResponseDto(String accessToken, String tokenType, Long expiresIn) {
+        this.accessToken = accessToken;
+        this.tokenType = tokenType;
+        this.expiresIn = expiresIn;
+    }
+
+    // 静态工厂方法，方便创建标准的Bearer Token响应
+    public static LoginResponseDto createBearerToken(String accessToken, Long expiresIn) {
+        return new LoginResponseDto(accessToken, "Bearer", expiresIn);
+    }
+
+    // Getter和Setter方法
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+
+    public String getTokenType() {
+        return tokenType;
+    }
+
+    public void setTokenType(String tokenType) {
+        this.tokenType = tokenType;
+    }
+
+    public Long getExpiresIn() {
+        return expiresIn;
+    }
+
+    public void setExpiresIn(Long expiresIn) {
+        this.expiresIn = expiresIn;
+    }
+
+    @Override
+    public String toString() {
+        return "LoginResponseDto{" +
+                "accessToken='[PROTECTED]'" + // 出于安全考虑，不在日志中显示完整token
+                ", tokenType='" + tokenType + '\'' +
+                ", expiresIn=" + expiresIn +
+                '}';
+    }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\MemberResponseDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+package com.example.taskplanning.dto;
+
+import com.example.taskplanning.entity.UserClassRelation;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class MemberResponseDto {
+    private Long userId;
+    private String username;
+    private String displayName;
+    private UserClassRelation.RoleInClass role; // 直接使用枚举类型
+
+    public MemberResponseDto(UserClassRelation relation) {
+        this.userId = relation.getUser().getId();
+        this.username = relation.getUser().getUsername();
+        this.displayName = relation.getUser().getName();
+        this.role = relation.getRole();
+    }
+}
+
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\RoleChangeDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+package com.example.taskplanning.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class RoleChangeDto {
+
+    @NotBlank(message = "角色不能为空")
+    @Pattern(regexp = "^(ADMIN|MEMBER)$", message = "角色只能是 ADMIN 或 MEMBER")
+    private String role;
+
+    public RoleChangeDto() {}
+
+    public RoleChangeDto(String role) {
+        this.role = role;
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\SyncResultDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+package com.example.taskplanning.dto;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "同步结果响应")
+public class SyncResultDto {
+
+    @Schema(description = "本次同步新增的任务数量")
+    private int newlySyncedTasks;
+
+    @Schema(description = "本次同步使用的范围")
+    private String syncRange;
+
+    @Schema(description = "在该时间范围内，班级总共的任务数量")
+    private int totalTasksInClassInRange;
+
+    public SyncResultDto() {}
+
+    public SyncResultDto(int newlySyncedTasks, String syncRange, int totalTasksInClassInRange) {
+        this.newlySyncedTasks = newlySyncedTasks;
+        this.syncRange = syncRange;
+        this.totalTasksInClassInRange = totalTasksInClassInRange;
+    }
+
+    // Getters and Setters
+    public int getNewlySyncedTasks() {
+        return newlySyncedTasks;
+    }
+
+    public void setNewlySyncedTasks(int newlySyncedTasks) {
+        this.newlySyncedTasks = newlySyncedTasks;
+    }
+
+    public String getSyncRange() {
+        return syncRange;
+    }
+
+    public void setSyncRange(String syncRange) {
+        this.syncRange = syncRange;
+    }
+
+    public int getTotalTasksInClassInRange() {
+        return totalTasksInClassInRange;
+    }
+
+    public void setTotalTasksInClassInRange(int totalTasksInClassInRange) {
+        this.totalTasksInClassInRange = totalTasksInClassInRange;
+    }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\TaskCreateDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// 2. TaskCreateDto.java - 创建任务请求DTO
+package com.example.taskplanning.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.time.LocalDateTime;
+
+public class TaskCreateDto {
+
+    @NotBlank(message = "任务标题不能为空")
+    @Size(max = 200, message = "任务标题长度不能超过200字符")
+    private String title;
+
+    @Size(max = 5000, message = "任务描述长度不能超过5000字符")
+    private String description;
+
+    @NotBlank(message = "课程名称不能为空")
+    @Size(max = 100, message = "课程名称长度不能超过100字符")
+    private String courseName;
+
+    @NotNull(message = "截止时间不能为空")
+    private LocalDateTime deadline;
+
+    // Getters and Setters
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public String getCourseName() { return courseName; }
+    public void setCourseName(String courseName) { this.courseName = courseName; }
+
+    public LocalDateTime getDeadline() { return deadline; }
+    public void setDeadline(LocalDateTime deadline) { this.deadline = deadline; }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\TaskResponseDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// 3. TaskResponseDto.java - 任务响应DTO
+package com.example.taskplanning.dto;
+
+import com.example.taskplanning.entity.Task;
+import com.example.taskplanning.entity.UserTaskRelation;
+import java.time.LocalDateTime;
+
+public class TaskResponseDto {
+
+    private Long id;
+    private String title;
+    private String description;
+    private String courseName;
+    private Task.TaskType taskType;
+    private LocalDateTime deadline;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    // 创建者信息
+    private Long creatorId;
+    private String creatorName;
+
+    // 班级信息（如果是班级任务）
+    private Long classId;
+    private String className;
+
+    // 个人状态信息（如果用户有个人关系记录）
+    private UserTaskRelation.TaskStatus personalStatus;
+    private LocalDateTime personalDeadline;
+    private String personalNotes;
+    private LocalDateTime completedAt;
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public String getCourseName() { return courseName; }
+    public void setCourseName(String courseName) { this.courseName = courseName; }
+
+    public Task.TaskType getTaskType() { return taskType; }
+    public void setTaskType(Task.TaskType taskType) { this.taskType = taskType; }
+
+    public LocalDateTime getDeadline() { return deadline; }
+    public void setDeadline(LocalDateTime deadline) { this.deadline = deadline; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Long getCreatorId() { return creatorId; }
+    public void setCreatorId(Long creatorId) { this.creatorId = creatorId; }
+
+    public String getCreatorName() { return creatorName; }
+    public void setCreatorName(String creatorName) { this.creatorName = creatorName; }
+
+    public Long getClassId() { return classId; }
+    public void setClassId(Long classId) { this.classId = classId; }
+
+    public String getClassName() { return className; }
+    public void setClassName(String className) { this.className = className; }
+
+    public UserTaskRelation.TaskStatus getPersonalStatus() { return personalStatus; }
+    public void setPersonalStatus(UserTaskRelation.TaskStatus personalStatus) { this.personalStatus = personalStatus; }
+
+    public LocalDateTime getPersonalDeadline() { return personalDeadline; }
+    public void setPersonalDeadline(LocalDateTime personalDeadline) { this.personalDeadline = personalDeadline; }
+
+    public String getPersonalNotes() { return personalNotes; }
+    public void setPersonalNotes(String personalNotes) { this.personalNotes = personalNotes; }
+
+    public LocalDateTime getCompletedAt() { return completedAt; }
+    public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\TaskStatusUpdateDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// 4. TaskStatusUpdateDto.java - 任务状态更新DTO
+package com.example.taskplanning.dto;
+
+import com.example.taskplanning.entity.UserTaskRelation;
+import jakarta.validation.constraints.NotNull;
+import java.time.LocalDateTime;
+
+public class TaskStatusUpdateDto {
+
+    @NotNull(message = "任务状态不能为空")
+    private UserTaskRelation.TaskStatus status;
+
+    private LocalDateTime personalDeadline;
+
+    private String personalNotes;
+
+    // Getters and Setters
+    public UserTaskRelation.TaskStatus getStatus() { return status; }
+    public void setStatus(UserTaskRelation.TaskStatus status) { this.status = status; }
+
+    public LocalDateTime getPersonalDeadline() { return personalDeadline; }
+    public void setPersonalDeadline(LocalDateTime personalDeadline) { this.personalDeadline = personalDeadline; }
+
+    public String getPersonalNotes() { return personalNotes; }
+    public void setPersonalNotes(String personalNotes) { this.personalNotes = personalNotes; }
+}
+
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\UserRegistrationDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// 1. 用户注册DTO (UserRegistrationDto.java)
+package com.example.taskplanning.dto;
+
+import jakarta.validation.constraints.*;
+
+public class UserRegistrationDto {
+
+    @NotBlank(message = "用户名不能为空")
+    @Size(min = 3, max = 50, message = "用户名长度必须在3-50个字符之间")
+    @Pattern(regexp = "^[a-zA-Z0-9_]+$", message = "用户名只能包含字母、数字和下划线")
+    private String username;
+
+    @NotBlank(message = "邮箱不能为空")
+    @Email(message = "邮箱格式不正确")
+    private String email;
+
+    @NotBlank(message = "密码不能为空")
+    @Size(min = 6, max = 20, message = "密码长度必须在6-20个字符之间")
+    private String password;
+
+    @NotBlank(message = "姓名不能为空")
+    @Size(min = 2, max = 50, message = "姓名长度必须在2-50个字符之间")
+    private String name;
+
+    @NotBlank(message = "手机号不能为空")
+    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
+    private String phone;
+
+    private String language = "zh-CN"; // 默认中文
+
+    // 构造函数
+    public UserRegistrationDto() {}
+
+    public UserRegistrationDto(String username, String email, String password, String name, String phone) {
+        this.username = username;
+        this.email = email;
+        this.password = password;
+        this.name = name;
+        this.phone = phone;
+    }
+
+    // Getter和Setter方法
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+
+    public String getLanguage() { return language; }
+    public void setLanguage(String language) { this.language = language; }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\UserResponseDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// 9. 用户响应DTO (UserResponseDto.java) - 用于返回用户信息时脱敏
+package com.example.taskplanning.dto;
+
+import java.time.LocalDateTime;
+
+public class UserResponseDto {
+
+    private Long id;
+    private String username;
+    private String email;
+    private String name;
+    private String avatarUrl;
+    private String language;
+    private boolean emailVerified;
+    private LocalDateTime lastLoginAt;
+    private boolean notificationSettings;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    // 构造函数
+    public UserResponseDto() {}
+
+    // Getter和Setter方法
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public String getAvatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+
+    public String getLanguage() { return language; }
+    public void setLanguage(String language) { this.language = language; }
+
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
+
+    public LocalDateTime getLastLoginAt() { return lastLoginAt; }
+    public void setLastLoginAt(LocalDateTime lastLoginAt) { this.lastLoginAt = lastLoginAt; }
+
+    public boolean isNotificationSettings() { return notificationSettings; }
+    public void setNotificationSettings(boolean notificationSettings) { this.notificationSettings = notificationSettings; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\UserRolePermissionResponseDto.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ --- 
+// UserRolePermissionResponseDto.java
+package com.example.taskplanning.dto;
+
+import com.example.taskplanning.entity.UserClassRelation;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.LocalDateTime;
+
+/**
+ * 用户在班级中的角色权限响应DTO
+ * 用于前端基于角色的UI条件渲染
+ */
+public class UserRolePermissionResponseDto {
+
+    @JsonProperty("isMember")
+    private boolean isMember;
+
+    @JsonProperty("role")
+    private String role;
+
+    @JsonProperty("isOwner")
+    private boolean isOwner;
+
+    @JsonProperty("isAdmin")
+    private boolean isAdmin;
+
+    @JsonProperty("canManageMembers")
+    private boolean canManageMembers;
+
+    @JsonProperty("canPublishTasks")
+    private boolean canPublishTasks;
+
+    @JsonProperty("canViewApprovals")
+    private boolean canViewApprovals;
+
+    @JsonProperty("canManageClass")
+    private boolean canManageClass;
+
+    @JsonProperty("joinedAt")
+    private LocalDateTime joinedAt;
+
+    // 构造函数 - 用于非成员情况
+    public UserRolePermissionResponseDto() {
+        this.isMember = false;
+        this.role = null;
+        this.isOwner = false;
+        this.isAdmin = false;
+        this.canManageMembers = false;
+        this.canPublishTasks = false;
+        this.canViewApprovals = false;
+        this.canManageClass = false;
+        this.joinedAt = null;
+    }
+
+    // 构造函数 - 用于成员情况
+    public UserRolePermissionResponseDto(UserClassRelation relation) {
+        this.isMember = true;
+        this.role = relation.getRole().toString();
+        this.isOwner = relation.getRole() == UserClassRelation.RoleInClass.OWNER;
+        this.isAdmin = relation.getRole() == UserClassRelation.RoleInClass.ADMIN;
+        this.joinedAt = relation.getJoinedAt();
+
+        // 根据角色设置权限
+        this.canManageMembers = this.isOwner;
+        this.canPublishTasks = this.isOwner || this.isAdmin;
+        this.canViewApprovals = this.isOwner || this.isAdmin;
+        this.canManageClass = this.isOwner;
+    }
+
+    // Getters and Setters
+    public boolean isMember() {
+        return isMember;
+    }
+
+    public void setMember(boolean member) {
+        isMember = member;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public boolean isOwner() {
+        return isOwner;
+    }
+
+    public void setOwner(boolean owner) {
+        isOwner = owner;
+    }
+
+    public boolean isAdmin() {
+        return isAdmin;
+    }
+
+    public void setAdmin(boolean admin) {
+        isAdmin = admin;
+    }
+
+    public boolean isCanManageMembers() {
+        return canManageMembers;
+    }
+
+    public void setCanManageMembers(boolean canManageMembers) {
+        this.canManageMembers = canManageMembers;
+    }
+
+    public boolean isCanPublishTasks() {
+        return canPublishTasks;
+    }
+
+    public void setCanPublishTasks(boolean canPublishTasks) {
+        this.canPublishTasks = canPublishTasks;
+    }
+
+    public boolean isCanViewApprovals() {
+        return canViewApprovals;
+    }
+
+    public void setCanViewApprovals(boolean canViewApprovals) {
+        this.canViewApprovals = canViewApprovals;
+    }
+
+    public boolean isCanManageClass() {
+        return canManageClass;
+    }
+
+    public void setCanManageClass(boolean canManageClass) {
+        this.canManageClass = canManageClass;
+    }
+
+    public LocalDateTime getJoinedAt() {
+        return joinedAt;
+    }
+
+    public void setJoinedAt(LocalDateTime joinedAt) {
+        this.joinedAt = joinedAt;
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\dto\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ActionLog.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- 
+package com.example.taskplanning.entity;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import java.time.LocalDateTime;
+
+@Getter
+@Setter
+@Entity
+@Table(name = "action_logs")
+public class ActionLog {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // 操作者，可以为null（系统操作）
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    @Column(nullable = false, length = 50)
+    private String action; // e.g., "CREATE_CLASS", "USER_LOGIN"
+
+    @Column(name = "entity_type", length = 50)
+    private String entityType; // e.g., "CLASS", "TASK"
+
+    @Column(name = "entity_id")
+    private Long entityId;
+
+    // 使用@Lob来存储可能很长的JSON字符串
+    @Lob
+    private String details; // 存储JSON格式的操作详情
+
+    @Column(name = "ip_address", length = 45)
+    private String ipAddress;
+
+    @Column(name = "user_agent", length = 500)
+    private String userAgent;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
+
+    // 为了方便创建日志，可以提供一个构造函数
+    public ActionLog() {
+    }
+
+    public ActionLog(User user, String action, String entityType, Long entityId, String details, String ipAddress, String userAgent) {
+        this.user = user;
+        this.action = action;
+        this.entityType = entityType;
+        this.entityId = entityId;
+        this.details = details;
+        this.ipAddress = ipAddress;
+        this.userAgent = userAgent;
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\Classes.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- 
+package com.example.taskplanning.entity;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
+@Getter
+@Setter
+@Entity
+@Table(name = "classes") // 明确表名
+public class Classes { // 使用ClassEntity避免与Java关键字'class'冲突
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 100)
+    private String name;
+
+    @Lob // @Lob注解表示这是一个大的文本字段，对应数据库的TEXT类型
+    private String description;
+
+    @Column(name = "invite_code", nullable = false, unique = true, length = 20)
+    private String inviteCode;
+
+    @Column(name = "is_public", nullable = false)
+    private boolean isPublic = false; // 默认不公开
+
+    @Column(name = "join_approval", nullable = false)
+    private boolean joinApprovalRequired = true; // 默认需要审批
+
+    @Enumerated(EnumType.STRING) // 将枚举类型以字符串形式存入数据库，可读性更好
+    @Column(nullable = false, length = 20)
+    private ClassStatus status = ClassStatus.ACTIVE; // 默认状态为活跃
+
+    // --- 关系与外键定义 ---
+
+    @ManyToOne(fetch = FetchType.LAZY) // 使用LAZY fetch, 性能更优
+    @JoinColumn(name = "owner_id", nullable = false)
+    private User owner; // 班级的创建者，直接引用User实体
+
+    // --- 自动管理的时间戳 ---
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    // --- 定义与User的多对多关系的反向端 (可选但推荐) ---
+    /*
+    @ManyToMany(mappedBy = "joinedClasses")
+    private Set<User> members = new HashSet<>();
+    */
+    // 注意：由于我们的中间表有额外字段，所以不会直接用@ManyToMany，
+    // 我们之后会通过UserClassRelation实体来管理这个关系。所以这里先注释掉。
+
+
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // 定义一个枚举来表示班级状态，比用字符串或数字更安全、更清晰
+    public enum ClassStatus {
+        ACTIVE,
+        ARCHIVED
+    }
+    // ...其他属性...
+    @OneToMany(mappedBy = "classEntity", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserClassRelation> memberRelations = new HashSet<>();
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\Task.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- 
+package com.example.taskplanning.entity;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
+@Getter
+@Setter
+@Entity
+@Table(name = "tasks")
+public class Task {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 200)
+    private String title;
+
+    @Lob
+    private String description;
+
+    @Column(name = "course_name", length = 100)
+    private String courseName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "task_type", nullable = false, length = 20)
+    private TaskType taskType; // 任务类型 (个人/班级)
+
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false; // 软删除标记，默认为false
+
+    private LocalDateTime deadline; // 截止时间
+
+
+    // --- 关系与外键定义 ---
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "creator_id", nullable = false)
+    private User creator; // 创建者
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "class_id") // 个人任务时，此字段可以为null
+    private Classes classEntity; // 所属班级
+
+    // --- 自动管理的时间戳 ---
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // 定义任务类型的枚举
+    public enum TaskType {
+        PERSONAL,
+        CLASS
+    }
+    // ...其他属性...
+    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserTaskRelation> userRelations = new HashSet<>();
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\User.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- 
+package com.example.taskplanning.entity;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import java.time.LocalDateTime;
+import java.util.Set; // 记得在文件顶部导入
+import java.util.HashSet;
+
+@Getter
+@Setter
+@Entity
+@Table(name = "users") // 明确指定表名为 users (复数)
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false)
+    private Long id;
+
+    @Column(name = "username", nullable = false, unique = true, length = 50)
+    private String username;
+
+    @Column(name = "email", nullable = false, unique = true, length = 100)
+    private String email;
+
+    @Column(name = "password", nullable = false)
+    private String password;
+
+    @Column(name="name",nullable = false)
+    private String name;
+
+    @Column(name="avatarUrl",nullable = true)
+    private String avatarUrl;
+
+    @Column(name="phone",nullable = false)
+    private String phone;
+
+    @Column(name="language",nullable = true)
+    private String language="zh-CN";
+
+    @Column(name="emailVerified",nullable = false)
+    private boolean emailVerified;
+
+    @Column(name="lastLoginAt",nullable = true)
+    private LocalDateTime lastLoginAt;
+
+    @Column(name="notificationSettings",nullable = false)
+    private boolean notificationSettings;
+
+    @Column(name = "created_at", updatable = false) // 创建后不可更新
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+// mappedBy = "owner" 指的是，这个一对多关系是由ClassEntity实体中的'owner'字段来维护的。
+// cascade = CascadeType.ALL 表示级联操作，比如删除用户时，他创建的班级也会被一并删除。
+// orphanRemoval = true 表示移除孤儿数据。
+    private Set<Classes> createdClasses = new HashSet<>();
+
+
+    // 使用 @PrePersist 和 @PreUpdate 注解自动管理时间戳
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+        // 注册时，将displayName默认设置为username
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+    // ...其他属性...
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserClassRelation> classRelations = new HashSet<>();
+    // ...其他属性...
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserTaskRelation> taskRelations = new HashSet<>();
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\UserClassRelation.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- 
+package com.example.taskplanning.entity;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import java.time.LocalDateTime;
+
+@Getter
+@Setter
+@Entity
+// 为 user_id 和 class_id 添加复合唯一约束，确保一个用户在一个班级里只有一条记录
+@Table(name = "user_class_relations", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "class_id"})
+})
+public class UserClassRelation {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id; // 使用代理主键，便于JPA操作
+
+    // --- 关系定义 ---
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "class_id", nullable = false)
+    private Classes classEntity;
+
+    // --- 关系属性 ---
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RoleInClass role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private JoinStatus status;
+
+    @Column(name = "join_reason", length = 500)
+    private String joinReason;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by") // 审批人ID，可以为null
+    private User approvedBy;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "joined_at")
+    private LocalDateTime joinedAt;
+
+    // --- 自动管理的时间戳 ---
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt; // 记录创建（即申请）时间
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt; // 记录关系最后更新时间
+
+
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // --- 枚举定义 (放在类内部，结构更清晰) ---
+
+    public enum RoleInClass {
+        OWNER,
+        ADMIN,
+        MEMBER
+    }
+
+    public enum JoinStatus {
+        PENDING,  // 待审批
+        APPROVED, // 已批准
+        REJECTED, // 已拒绝
+        REMOVED   // 已移除 (被踢出或自己退出)
+    }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\UserTaskRelation.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ --- 
+package com.example.taskplanning.entity;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import java.time.LocalDateTime;
+
+@Getter
+@Setter
+@Entity
+@Table(name = "user_task_relations", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "task_id"})
+})
+public class UserTaskRelation {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id; // 代理主键
+
+    // --- 关系定义 ---
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "task_id", nullable = false)
+    private Task task;
+
+    // --- 关系属性 (用户的"个人看法") ---
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TaskStatus status = TaskStatus.TODO; // 个人完成状态，默认为待办
+
+    @Column(name = "personal_deadline")
+    private LocalDateTime personalDeadline; // 个人设定的截止时间
+
+    @Lob // @Lob注解表示这是一个大的文本字段，对应数据库的TEXT类型
+    @Column(name = "personal_notes")
+    private String personalNotes; // 个人备注
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt; // 完成时间
+
+    // --- 自动管理的时间戳 ---
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt; // 关系创建时间 (即"导入"时间)
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt; // 关系更新时间 (即修改个人状态的时间)
+
+
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // --- 枚举定义 ---
+
+    public enum TaskStatus {
+        TODO,       // 待办
+        IN_PROGRESS,// 进行中
+        DONE        // 已完成
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\entity\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\exception\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\exception\BusinessException.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\exception\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\exception\ --- 
+// 3. 自定义业务异常 (BusinessException.java)
+package com.example.taskplanning.exception;
+
+public class BusinessException extends RuntimeException {
+
+    private String errorCode;
+    private int httpStatus;
+
+    public BusinessException(String errorCode, String message) {
+        super(message);
+        this.errorCode = errorCode;
+        this.httpStatus = 400;
+    }
+
+    public BusinessException(String errorCode, String message, int httpStatus) {
+        super(message);
+        this.errorCode = errorCode;
+        this.httpStatus = httpStatus;
+    }
+
+    public String getErrorCode() { return errorCode; }
+    public int getHttpStatus() { return httpStatus; }
+
+    //
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\exception\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\exception\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\exception\GlobalExceptionHandler.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\exception\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\exception\ --- 
+// 7. 全局异常处理器 (GlobalExceptionHandler.java)
+package com.example.taskplanning.exception;
+
+import com.example.taskplanning.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.nio.file.AccessDeniedException;
+import java.util.HashMap;
+import java.util.Map;
+
+@Slf4j
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    /**
+     * 处理业务异常
+     */
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
+        log.warn("业务异常: {} - {}", e.getErrorCode(), e.getMessage());
+
+        ApiResponse<Void> response = ApiResponse.error(
+                e.getErrorCode(),
+                e.getMessage(),
+                e.getHttpStatus()
+        );
+        return ResponseEntity.status(e.getHttpStatus()).body(response);
+    }
+
+    /**
+     * 处理数据校验异常
+     */
+    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationException(Exception e) {
+        log.warn("数据校验异常: {}", e.getMessage());
+
+        Map<String, String> errors = new HashMap<>();
+
+        if (e instanceof MethodArgumentNotValidException) {
+            MethodArgumentNotValidException ex = (MethodArgumentNotValidException) e;
+            ex.getBindingResult().getAllErrors().forEach((error) -> {
+                String fieldName = ((FieldError) error).getField();
+                String errorMessage = error.getDefaultMessage();
+                errors.put(fieldName, errorMessage);
+            });
+        } else if (e instanceof BindException) {
+            BindException ex = (BindException) e;
+            ex.getBindingResult().getAllErrors().forEach((error) -> {
+                String fieldName = ((FieldError) error).getField();
+                String errorMessage = error.getDefaultMessage();
+                errors.put(fieldName, errorMessage);
+            });
+        }
+
+        ApiResponse<Map<String, String>> response = ApiResponse.error(
+                "VALIDATION_ERROR",
+                "数据校验失败",
+                400
+        );
+        response.setData(errors);
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * 处理数据库约束异常
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolationException(DataIntegrityViolationException e) {
+        log.error("数据库约束异常: {}", e.getMessage());
+
+        String message = "数据操作失败";
+        String errorCode = "DATA_CONSTRAINT_VIOLATION";
+
+        // 根据异常消息判断具体的约束违反类型
+        if (e.getMessage().contains("username")) {
+            message = "用户名已存在";
+            errorCode = "USERNAME_EXISTS";
+        } else if (e.getMessage().contains("email")) {
+            message = "邮箱已被注册";
+            errorCode = "EMAIL_EXISTS";
+        } else if (e.getMessage().contains("phone")) {
+            message = "手机号已被注册";
+            errorCode = "PHONE_EXISTS";
+        }
+
+        ApiResponse<Void> response = ApiResponse.error(errorCode, message, 400);
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * 权限不足异常
+     */
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    //@ResponseStatus(HttpStatus.FORBIDDEN) // <-- 返回 403
+    public ResponseEntity<ApiResponse<Void>> handleAuthorizationDeniedException(AuthorizationDeniedException e) {
+        // 添加日志记录，便于调试
+        log.error("检查班级管理权限时发生异常: {}", e.getMessage(), e);
+        ApiResponse<Void> response = ApiResponse.error(
+                "ACCESS_DENIED,",
+                "e.getMessage()",
+                403
+        );
+        return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
+    }
+
+    /**
+     * 处理其他未预期的异常
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception e) {
+        log.error("未处理的异常: {}", e.getMessage(), e);
+
+        ApiResponse<Void> response = ApiResponse.error(
+                "INTERNAL_ERROR",
+                "服务器内部错误",
+                500
+        );
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\exception\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ActionLogRepository.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- 
+package com.example.taskplanning.repository;
+
+import com.example.taskplanning.entity.ActionLog;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ActionLogRepository extends JpaRepository<ActionLog, Long> {
+
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ClassRepository.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- 
+// 1. ClassRepository.java
+package com.example.taskplanning.repository;
+
+import com.example.taskplanning.entity.Classes;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+
+@Repository
+public interface ClassRepository extends JpaRepository<Classes, Long> {
+
+    /**
+     * 根据邀请码查找班级
+     * @param inviteCode 邀请码
+     * @return 班级实体的Optional包装
+     */
+    Optional<Classes> findByInviteCode(String inviteCode);
+}
+
+
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\TaskRepository.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- 
+// 6. TaskRepository.java - 任务数据访问接口
+package com.example.taskplanning.repository;
+
+import com.example.taskplanning.entity.Task;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Repository
+public interface TaskRepository extends JpaRepository<Task, Long> {
+
+    /**
+     * 查找指定班级的所有未删除任务
+     */
+    Page<Task> findByClassEntityIdAndIsDeletedFalseOrderByDeadlineAsc(Long classId, Pageable pageable);
+
+    /**
+     * 查找用户的个人任务
+     */
+    Page<Task> findByCreatorIdAndTaskTypeAndIsDeletedFalseOrderByDeadlineAsc(Long creatorId, Task.TaskType taskType, Pageable pageable);
+
+    /**
+     * 查找指定时间范围内用户相关的所有任务（用于日历视图）
+     * 严格遵循"用户自主控制"原则：
+     * 1. 用户的个人任务
+     * 2. 用户已主动关联的班级任务（通过 user_task_relations 表）
+     */
+    @Query("""
+    SELECT DISTINCT t FROM Task t 
+    WHERE t.isDeleted = false 
+    AND (
+        (t.taskType = 'PERSONAL' AND t.creator.id = :userId)
+        OR 
+        (t.taskType = 'CLASS' AND EXISTS (
+            SELECT 1 FROM UserTaskRelation utr 
+            WHERE utr.task.id = t.id AND utr.user.id = :userId
+        ))
+    )
+    AND (
+        (t.createdAt BETWEEN :startDate AND :endDate)
+        OR 
+        (t.deadline BETWEEN :startDate AND :endDate)
+    )
+    ORDER BY t.deadline ASC
+""")
+    List<Task> findUserRelatedTasksInDateRange(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
+    /**
+     * 新增：专门获取用户已关联的班级任务（供智能同步使用）
+     * @param userId 用户ID
+     * @param startDate 开始时间
+     * @param endDate 结束时间
+     * @return 用户已关联的班级任务列表
+     */
+    @Query("""
+    SELECT DISTINCT t FROM Task t 
+    JOIN UserTaskRelation utr ON t.id = utr.task.id 
+    WHERE utr.user.id = :userId 
+    AND t.taskType = 'CLASS' 
+    AND t.isDeleted = false 
+    AND (
+        (t.createdAt BETWEEN :startDate AND :endDate)
+        OR 
+        (t.deadline BETWEEN :startDate AND :endDate)
+    )
+    ORDER BY t.deadline ASC
+""")
+    List<Task> findLinkedClassTasksInDateRange(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
+
+    /**
+     * 检查任务是否存在且未删除
+     */
+    boolean existsByIdAndIsDeletedFalse(Long taskId);
+
+    /**
+     * 查找用户可访问的任务（用于权限验证）
+     */
+    @Query("""
+    SELECT t FROM Task t 
+    WHERE t.id = :taskId AND t.isDeleted = false 
+    AND (
+        (t.taskType = 'PERSONAL' AND t.creator.id = :userId)
+        OR 
+        (t.taskType = 'CLASS' AND EXISTS (
+            SELECT 1 FROM UserTaskRelation utr 
+            WHERE utr.task.id = t.id AND utr.user.id = :userId
+        ))
+    )
+""")
+    Task findAccessibleTaskByUserAndTaskId(@Param("userId") Long userId, @Param("taskId") Long taskId);
+    /**
+     * 获取指定班级在指定时间范围内创建的所有任务ID列表
+     * @param classId 班级ID
+     * @param startTime 开始时间（包含）
+     * @return 任务ID列表
+     */
+    @Query("SELECT t.id FROM Task t WHERE t.classEntity.id = :classId AND t.createdAt >= :startTime")
+    List<Long> findTaskIdsByClassIdAndCreatedAtAfter(@Param("classId") Long classId, @Param("startTime") LocalDateTime startTime);
+    /**
+     * 获取用户在指定时间范围内的个人任务
+     */
+    @Query("""
+    SELECT t FROM Task t 
+    WHERE t.creator.id = :userId 
+    AND t.taskType = 'PERSONAL' 
+    AND t.isDeleted = false 
+    AND (
+        (t.createdAt BETWEEN :startDate AND :endDate)
+        OR 
+        (t.deadline BETWEEN :startDate AND :endDate)
+    )
+    ORDER BY t.deadline ASC
+""")
+    List<Task> findPersonalTasksInDateRange(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\UserClassRelationRepository.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- 
+// 2. UserClassRelationRepository.java
+package com.example.taskplanning.repository;
+
+import com.example.taskplanning.entity.Classes;
+import com.example.taskplanning.entity.User;
+import com.example.taskplanning.entity.UserClassRelation;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+import java.util.List;
+
+@Repository
+public interface UserClassRelationRepository extends JpaRepository<UserClassRelation, Long> {
+
+    /**
+     * 查找用户和班级之间的关系记录
+     * @param user 用户实体
+     * @param classEntity 班级实体
+     * @return 用户班级关系的Optional包装
+     */
+    Optional<UserClassRelation> findByUserAndClassEntity(User user, Classes classEntity);
+
+    /**
+     * 分页查询指定班级中指定状态的用户关系记录
+     * @param classEntity 班级实体
+     * @param status 关系状态
+     * @param pageable 分页参数
+     * @return 分页的用户班级关系记录
+     */
+    Page<UserClassRelation> findByClassEntityAndStatus(
+            Classes classEntity,
+            UserClassRelation.JoinStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * 分页查询指定用户的指定状态的班级关系记录
+     * @param user 用户实体
+     * @param status 关系状态
+     * @param pageable 分页参数
+     * @return 分页的用户班级关系记录
+     */
+    Page<UserClassRelation> findByUserAndStatus(
+            User user,
+            UserClassRelation.JoinStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * 查询用户在指定班级中的角色和状态
+     * 这个方法用于权限检查，确保用户是ADMIN或OWNER
+     * @param userId 用户ID
+     * @param classId 班级ID
+     * @param role 用户角色
+     * @param status 关系状态
+     * @return 用户班级关系的Optional包装
+     */
+    @Query("SELECT ucr FROM UserClassRelation ucr " +
+            "WHERE ucr.user.id = :userId " +
+            "AND ucr.classEntity.id = :classId " +
+            "AND ucr.role = :role " +
+            "AND ucr.status = :status")
+    Optional<UserClassRelation> findByUserIdAndClassIdAndRoleAndStatus(
+            @Param("userId") Long userId,
+            @Param("classId") Long classId,
+            @Param("role") UserClassRelation.RoleInClass role,
+            @Param("status") UserClassRelation.JoinStatus status
+    );
+
+    /**
+     * 检查用户是否在指定班级中拥有管理权限（ADMIN或OWNER）
+     * @param userId 用户ID
+     * @param classId 班级ID
+     * @return 如果用户是ADMIN或OWNER且状态为APPROVED则返回true
+     */
+    @Query("SELECT CASE WHEN COUNT(ucr) > 0 THEN true ELSE false END " +
+            "FROM UserClassRelation ucr " +
+            "WHERE ucr.user.id = :userId " +
+            "AND ucr.classEntity.id = :classId " +
+            "AND ucr.role IN ('ADMIN', 'OWNER') " +
+            "AND ucr.status = 'APPROVED'")
+    boolean hasAdminPermission(
+            @Param("userId") Long userId,
+            @Param("classId") Long classId
+    );
+
+    /**
+     * 查找指定用户和班级之间的PENDING状态申请记录
+     * @param userId 申请用户ID
+     * @param classId 班级ID
+     * @return PENDING状态的关系记录
+     */
+    @Query("SELECT ucr FROM UserClassRelation ucr " +
+            "WHERE ucr.user.id = :userId " +
+            "AND ucr.classEntity.id = :classId " +
+            "AND ucr.status = 'PENDING'")
+    Optional<UserClassRelation> findPendingApplicationByUserIdAndClassId(
+            @Param("userId") Long userId,
+            @Param("classId") Long classId
+    );
+
+    /**
+     * 检查用户是否为班级的管理员或创建者
+     */
+    boolean existsByUserIdAndClassEntityIdAndRoleInAndStatus(
+            Long userId,
+            Long classId,
+            List<UserClassRelation.RoleInClass> roles,
+            UserClassRelation.JoinStatus status
+    );
+
+    /**
+     * 检查用户是否为班级成员
+     */
+    boolean existsByUserIdAndClassEntityIdAndStatus(
+            Long userId,
+            Long classId,
+            UserClassRelation.JoinStatus status
+    );
+
+    /**
+     * 查找用户在所有已批准班级中的关系
+     */
+    List<UserClassRelation> findByUserIdAndStatus(Long userId, UserClassRelation.JoinStatus status);
+
+    // ===== 新增方法：支持角色管理功能 =====
+
+    /**
+     * 检查用户是否是指定班级的指定角色且状态为已批准
+     * 用于检查是否为班级创建者(Owner)
+     * @param userId 用户ID
+     * @param classId 班级ID
+     * @param role 角色
+     * @param status 状态
+     * @return 是否存在匹配的记录
+     */
+    boolean existsByUserIdAndClassEntityIdAndRoleAndStatus(
+            Long userId,
+            Long classId,
+            UserClassRelation.RoleInClass role,
+            UserClassRelation.JoinStatus status
+    );
+
+    /**
+     * 根据用户ID、班级ID和状态查找关系记录
+     * 用于角色管理时查找要修改的成员记录
+     * @param userId 用户ID
+     * @param classId 班级ID
+     * @param status 状态
+     * @return 关系记录的Optional包装
+     */
+    @Query("SELECT ucr FROM UserClassRelation ucr " +
+            "WHERE ucr.user.id = :userId " +
+            "AND ucr.classEntity.id = :classId " +
+            "AND ucr.status = :status")
+    Optional<UserClassRelation> findByUserIdAndClassEntityIdAndStatus(
+            @Param("userId") Long userId,
+            @Param("classId") Long classId,
+            @Param("status") UserClassRelation.JoinStatus status
+    );
+    // 用于 isClassMember
+    boolean existsByUser_IdAndClassEntity_IdAndStatus(Long userId, Long classId, UserClassRelation.JoinStatus status);
+
+    // 用于 canManageClass 和 isClassOwner
+    Optional<UserClassRelation> findByUser_IdAndClassEntity_IdAndStatus(Long userId, Long classId, UserClassRelation.JoinStatus status);
+
+
+    /**
+     * 根据班级ID和成员状态，分页查询关系记录
+     * Spring Data JPA会自动根据方法名生成查询
+     * @param classId 班级ID
+     * @param status 成员的加入状态
+     * @param pageable 分页参数
+     * @return 分页的关系记录
+     */
+    Page<UserClassRelation> findByClassEntity_IdAndStatus(Long classId, UserClassRelation.JoinStatus status, Pageable pageable);
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\UserRepository.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- 
+// 4. 用户Repository (UserRepository.java)
+package com.example.taskplanning.repository;
+
+import com.example.taskplanning.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+
+    /**
+     * 根据用户名检查用户是否存在
+     */
+    boolean existsByUsername(String username);
+
+    /**
+     * 根据邮箱检查用户是否存在
+     */
+    boolean existsByEmail(String email);
+
+    /**
+     * 根据手机号检查用户是否存在
+     */
+    boolean existsByPhone(String phone);
+
+    /**
+     * 根据用户名查找用户（用于登录）
+     */
+    Optional<User> findByUsername(String username);
+
+    /**
+     * 根据邮箱查找用户（用于登录）
+     */
+    Optional<User> findByEmail(String email);
+
+    /**
+     * 根据用户名或邮箱查找用户
+     */
+    @Query("SELECT u FROM User u WHERE u.username = :usernameOrEmail OR u.email = :usernameOrEmail")
+    Optional<User> findByUsernameOrEmail(@Param("usernameOrEmail") String usernameOrEmail);
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\UserTaskRelationRepository.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ --- 
+// 7. UserTaskRelationRepository.java - 用户任务关系数据访问接口
+package com.example.taskplanning.repository;
+
+import com.example.taskplanning.entity.UserClassRelation;
+import com.example.taskplanning.entity.UserTaskRelation;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+import java.util.List;
+
+@Repository
+public interface UserTaskRelationRepository extends JpaRepository<UserTaskRelation, Long> {
+
+    /**
+     * 查找用户与特定任务的关系
+     */
+    Optional<UserTaskRelation> findByUserIdAndTaskId(Long userId, Long taskId);
+
+    /**
+     * 查找用户的所有任务关系
+     */
+    List<UserTaskRelation> findByUserId(Long userId);
+
+    /**
+     * 检查用户与任务的关系是否存在
+     */
+    boolean existsByUserIdAndTaskId(Long userId, Long taskId);
+
+    /**
+     * 删除用户与任务的关系
+     */
+    void deleteByUserIdAndTaskId(Long userId, Long taskId);
+
+    /**
+     * 获取指定用户已关联的所有任务ID列表
+     * @param userId 用户ID
+     * @return 任务ID列表
+     */
+    @Query("SELECT utr.task.id FROM UserTaskRelation utr WHERE utr.user.id = :userId")
+    List<Long> findTaskIdsByUserId(@Param("userId") Long userId);
+}
+
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\repository\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ClassService.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- 
+// ClassService.java
+package com.example.taskplanning.service;
+
+import com.example.taskplanning.dto.*;
+import com.example.taskplanning.entity.Classes;
+import com.example.taskplanning.entity.User;
+import com.example.taskplanning.entity.UserClassRelation;
+import com.example.taskplanning.exception.BusinessException;
+import com.example.taskplanning.repository.ClassRepository;
+import com.example.taskplanning.repository.UserClassRelationRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.util.Optional;
+import com.example.taskplanning.annotation.LogAction;
+
+@Service
+@Transactional
+public class ClassService {
+
+    private final ClassRepository classRepository;
+    private final UserClassRelationRepository userClassRelationRepository;
+    private final UserService userService;
+
+    private static final String INVITE_CODE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private static final int INVITE_CODE_LENGTH = 8;
+    private static final SecureRandom random = new SecureRandom();
+
+    @Autowired
+    public ClassService(ClassRepository classRepository,
+                        UserClassRelationRepository userClassRelationRepository,
+                        UserService userService) {
+        this.classRepository = classRepository;
+        this.userClassRelationRepository = userClassRelationRepository;
+        this.userService = userService;
+    }
+
+    /**
+     * 创建班级
+     * @param createDto 创建班级的DTO
+     * @return 创建的班级响应DTO
+     */
+    @LogAction(action = "CLASS_CREATE", entityType = "CLASS")
+    public ClassResponseDto createClass(ClassCreateDto createDto) {
+        // 获取当前登录用户
+        User creator = userService.getCurrentUserEntity();
+
+        // 生成唯一的邀请码
+        String inviteCode = generateUniqueInviteCode();
+
+        // 创建班级实体
+        Classes classEntity = new Classes();
+        classEntity.setName(createDto.getName());
+        classEntity.setDescription(createDto.getDescription());
+        classEntity.setInviteCode(inviteCode);
+        classEntity.setPublic(createDto.isPublic());
+        classEntity.setJoinApprovalRequired(createDto.isJoinApprovalRequired());
+        classEntity.setCreatedAt(LocalDateTime.now());
+        classEntity.setOwner(creator);
+
+        // 保存班级
+        Classes savedClass = classRepository.save(classEntity);
+
+        // 在同一事务中创建创建者的班级关系记录
+        UserClassRelation ownerRelation = new UserClassRelation();
+        ownerRelation.setUser(creator);
+        ownerRelation.setClassEntity(savedClass);
+        ownerRelation.setRole(UserClassRelation.RoleInClass.OWNER);
+        ownerRelation.setStatus(UserClassRelation.JoinStatus.APPROVED);
+        ownerRelation.setJoinedAt(LocalDateTime.now());
+        ownerRelation.setCreatedAt(LocalDateTime.now());
+
+        userClassRelationRepository.save(ownerRelation);
+
+        return convertToClassResponseDto(savedClass);
+    }
+
+    /**
+     * 根据邀请码查找班级
+     * @param inviteCode 邀请码
+     * @return 班级响应DTO
+     * @throws BusinessException 如果班级不存在
+     */
+    @Transactional(readOnly = true)
+    public ClassResponseDto findClassByInviteCode(String inviteCode) {
+        Classes classEntity = classRepository.findByInviteCode(inviteCode)
+                .orElseThrow(() -> new BusinessException("PermissionDeniedException", "邀请码无效或班级不存在"));
+
+        return convertToClassResponseDto(classEntity);
+    }
+
+    /**
+     * 申请加入班级
+     * @param classId 班级ID
+     * @param joinRequestDto 加入申请DTO
+     * @throws BusinessException 如果班级不存在或用户已是成员/已有待处理申请
+     */
+    @LogAction(action = "CLASS_JOIN_APPLY", entityType = "CLASS")
+    public void applyToJoinClass(Long classId, ClassJoinRequestDto joinRequestDto) {
+        // 获取当前登录用户
+        User applicant = userService.getCurrentUserEntity();
+
+        // 查找班级
+        Classes classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new BusinessException("applyToJoinClass_FAILED", "班级不存在"));
+
+        // 检查用户是否已经是成员或已有待处理申请
+        Optional<UserClassRelation> existingRelation =
+                userClassRelationRepository.findByUserAndClassEntity(applicant, classEntity);
+
+        if (existingRelation.isPresent()) {
+            UserClassRelation relation = existingRelation.get();
+            if (relation.getStatus() == UserClassRelation.JoinStatus.APPROVED) {
+                throw new BusinessException("applyToJoinClass_FAILED", "您已经是该班级的成员");
+            } else if (relation.getStatus() == UserClassRelation.JoinStatus.PENDING) {
+                throw new BusinessException("applyToJoinClass_FAILED", "您已有待处理的加入申请");
+            }
+        }
+
+        // 创建新的申请记录
+        UserClassRelation newRelation = new UserClassRelation();
+        newRelation.setUser(applicant);
+        newRelation.setClassEntity(classEntity);
+        newRelation.setRole(UserClassRelation.RoleInClass.MEMBER); // 默认角色为成员
+        newRelation.setStatus(UserClassRelation.JoinStatus.PENDING);
+        newRelation.setJoinReason(joinRequestDto.getJoinReason());
+        newRelation.setCreatedAt(LocalDateTime.now());
+
+        userClassRelationRepository.save(newRelation);
+    }
+
+    /**
+     * 获取班级的待审批申请列表
+     * @param classId 班级ID
+     * @param pageable 分页参数
+     * @return 分页的待审批申请列表
+     * @throws BusinessException 如果用户无权限或班级不存在
+     */
+    @Transactional(readOnly = true)
+    public Page<ApprovalResponseDto> getApprovalList(Long classId, Pageable pageable) {
+        // 获取当前登录用户
+        User currentUser = userService.getCurrentUserEntity();
+
+        // 检查班级是否存在
+        Classes classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new BusinessException("getApprovalList_FAILED", "班级不存在"));
+
+        // 权限检查：验证当前用户是否是该班级的ADMIN或OWNER
+        if (!hasClassAdminPermission(currentUser.getId(), classId)) {
+            throw new BusinessException("PermissionDenied", "您没有权限查看该班级的申请列表");
+        }
+
+        // 分页查询PENDING状态的申请
+        Page<UserClassRelation> pendingApplications =
+                userClassRelationRepository.findByClassEntityAndStatus(
+                        classEntity,
+                        UserClassRelation.JoinStatus.PENDING,
+                        pageable
+                );
+
+        // 转换为响应DTO
+        return pendingApplications.map(this::convertToApprovalResponseDto);
+    }
+
+    /**
+     * 处理申请审批
+     * @param classId 班级ID
+     * @param applicantUserId 申请人用户ID
+     * @param approvalActionDto 审批操作DTO
+     * @return 处理结果消息
+     * @throws BusinessException 如果审批者无权限或申请不存在或班级不存在
+     */
+    public String processApproval(Long classId, Long applicantUserId, ApprovalActionDto approvalActionDto) {
+        // 获取当前登录用户（审批者）
+        User approver = userService.getCurrentUserEntity();
+
+        // 检查班级是否存在
+        Classes classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new BusinessException("processApproval_FAILED", "班级不存在"));
+
+        // 权限检查：验证审批者是否是ADMIN或OWNER
+        if (!hasClassAdminPermission(approver.getId(), classId)) {
+            throw new BusinessException("PermissionDenied", "您没有权限处理该班级的申请");
+        }
+
+        // 查找申请者和班级的PENDING状态关系记录
+        UserClassRelation pendingRelation =
+                userClassRelationRepository.findPendingApplicationByUserIdAndClassId(applicantUserId, classId)
+                        .orElseThrow(() -> new BusinessException("processApproval_FAILED", "未找到待处理的申请记录"));
+
+        // 根据action更新关系记录状态
+        String resultMessage;
+        if ("APPROVE".equals(approvalActionDto.getAction())) {
+            // 批准申请
+            pendingRelation.setStatus(UserClassRelation.JoinStatus.APPROVED);
+            pendingRelation.setJoinedAt(LocalDateTime.now());
+            pendingRelation.setApprovedBy(approver);
+            resultMessage = "申请已批准";
+        } else if ("REJECT".equals(approvalActionDto.getAction())) {
+            // 拒绝申请
+            pendingRelation.setStatus(UserClassRelation.JoinStatus.REJECTED);
+            pendingRelation.setApprovedBy(approver);
+            resultMessage = "申请已拒绝";
+        } else {
+            throw new BusinessException("processApproval_FAILED", "无效的审批操作");
+        }
+
+        // 更新审批时间
+        pendingRelation.setUpdatedAt(LocalDateTime.now());
+        userClassRelationRepository.save(pendingRelation);
+
+        return resultMessage;
+    }
+
+    /**
+     * 获取用户加入的所有班级
+     * @param pageable 分页参数
+     * @return 分页的班级列表
+     */
+    @Transactional(readOnly = true)
+    public Page<ClassResponseDto> getMyClasses(Pageable pageable) {
+        // 获取当前登录用户
+        User currentUser = userService.getCurrentUserEntity();
+
+        // 分页查询该用户所有APPROVED状态的班级关系记录
+        Page<UserClassRelation> approvedRelations =
+                userClassRelationRepository.findByUserAndStatus(
+                        currentUser,
+                        UserClassRelation.JoinStatus.APPROVED,
+                        pageable
+                );
+
+        // 转换为ClassResponseDto
+        return approvedRelations.map(relation -> convertToClassResponseDto(relation.getClassEntity()));
+    }
+
+    /**
+     * 变更班级成员角色 - 由Controller调用，已通过@PreAuthorize确保操作者为Owner
+     * @param classId 班级ID
+     * @param userId 要变更角色的用户ID
+     * @param newRole 新的角色枚举 (ADMIN 或 MEMBER)
+     * @throws BusinessException 如果用户不存在、角色无效或尝试修改Owner
+     */
+    public void changeMemberRole(Long classId, Long userId, UserClassRelation.RoleInClass newRole) {
+        // 获取当前用户（操作者）
+        User currentOperator = userService.getCurrentUserEntity();
+
+        // 查找要修改角色的用户与班级的关系记录
+        UserClassRelation relation = userClassRelationRepository.findByUserIdAndClassEntityIdAndStatus(
+                        userId, classId, UserClassRelation.JoinStatus.APPROVED)
+                .orElseThrow(() -> new BusinessException("changeMemberRole_FAILED", "用户不是该班级的已批准成员"));
+
+        // 安全检查：不允许修改创建者(Owner)的角色
+        if (relation.getRole() == UserClassRelation.RoleInClass.OWNER) {
+            throw new BusinessException("changeMemberRole_FAILED", "不能修改班级创建者的角色");
+        }
+
+        // 不允许创建者修改自己的角色（虽然理论上Owner不会走到这里）
+        if (userId.equals(currentOperator.getId())) {
+            throw new BusinessException("changeMemberRole_FAILED", "不能修改自己的角色");
+        }
+
+
+        // 只允许设置为ADMIN或MEMBER
+        if (newRole != UserClassRelation.RoleInClass.ADMIN &&
+                newRole != UserClassRelation.RoleInClass.MEMBER) {
+            throw new BusinessException("changeMemberRole_FAILED", "只能设置角色为管理员或普通成员");
+        }
+
+        // 检查是否真的需要更新
+        if (relation.getRole() == newRole) {
+            return; // 角色相同，无需更新
+        }
+
+        // 更新角色
+        relation.setRole(newRole);
+        relation.setUpdatedAt(LocalDateTime.now());
+
+        userClassRelationRepository.save(relation);
+    }
+
+    /**
+     * 检查用户在指定班级的权限
+     * @param classId 班级ID
+     * @return 是否有管理权限
+     */
+    @Transactional(readOnly = true)
+    public boolean checkClassPermission(Long classId) {
+        User currentUser = userService.getCurrentUserEntity();
+        return hasClassAdminPermission(currentUser.getId(), classId);
+    }
+
+    /**
+     * 检查用户是否有班级管理权限
+     * @param userId 用户ID
+     * @param classId 班级ID
+     * @return 是否有管理权限
+     */
+    @Transactional(readOnly = true)
+    public boolean hasClassAdminPermission(Long userId, Long classId) {
+        return userClassRelationRepository.hasAdminPermission(userId, classId);
+    }
+
+    /**
+     * 生成唯一的邀请码
+     * @return 8位随机邀请码
+     */
+    private String generateUniqueInviteCode() {
+        String inviteCode;
+        do {
+            inviteCode = generateRandomString(INVITE_CODE_LENGTH);
+        } while (classRepository.findByInviteCode(inviteCode).isPresent());
+
+        return inviteCode;
+    }
+
+    /**
+     * 生成指定长度的随机字符串
+     * @param length 字符串长度
+     * @return 随机字符串
+     */
+    private String generateRandomString(int length) {
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            int index = random.nextInt(INVITE_CODE_CHARS.length());
+            sb.append(INVITE_CODE_CHARS.charAt(index));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 将Classes实体转换为ClassResponseDto
+     * @param classEntity 班级实体
+     * @return 班级响应DTO
+     */
+    private ClassResponseDto convertToClassResponseDto(Classes classEntity) {
+        return new ClassResponseDto(classEntity, classEntity.getOwner());
+    }
+
+    /**
+     * 将UserClassRelation实体转换为ApprovalResponseDto
+     * @param relation 用户班级关系实体
+     * @return 审批响应DTO
+     */
+    private ApprovalResponseDto convertToApprovalResponseDto(UserClassRelation relation) {
+        return new ApprovalResponseDto(relation);
+    }
+    /**
+     * 获取班级成员列表 (分页)
+     */
+    @Transactional(readOnly = true)
+    public Page<MemberResponseDto> getMemberList(Long classId, Pageable pageable) {
+        // @PreAuthorize 已经保证了当前用户是成员，所以这里不再重复检查权限
+
+        // 去关系表中，分页查询所有已批准的成员
+        Page<UserClassRelation> relationPage = userClassRelationRepository
+                .findByClassEntity_IdAndStatus(classId, UserClassRelation.JoinStatus.APPROVED, pageable);
+
+        // 将查询结果 (Page<UserClassRelation>) 转换为 (Page<MemberResponseDto>)
+        return relationPage.map(MemberResponseDto::new);
+    }
+    /**
+     * 获取用户在指定班级中的角色和权限信息
+     * @param classId 班级ID
+     * @return 用户角色权限DTO
+     */
+    @Transactional(readOnly = true)
+    public UserRolePermissionResponseDto getUserRoleInClass(Long classId) {
+        // 获取当前登录用户
+        User currentUser = userService.getCurrentUserEntity();
+
+        // 检查班级是否存在
+        Classes classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new BusinessException("getUserRoleInClass_FAILED", "班级不存在"));
+
+        // 查找用户与班级的关系记录
+        Optional<UserClassRelation> relationOpt =
+                userClassRelationRepository.findByUserAndClassEntity(currentUser, classEntity);
+
+        // 如果没有找到关系记录或状态不是APPROVED，说明不是班级成员
+        if (relationOpt.isEmpty() || relationOpt.get().getStatus() != UserClassRelation.JoinStatus.APPROVED) {
+            return new UserRolePermissionResponseDto(); // 返回默认的非成员状态
+        }
+
+        // 根据关系记录构建权限DTO
+        return new UserRolePermissionResponseDto(relationOpt.get());
+    }
+
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\LogService.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- 
+package com.example.taskplanning.service;
+
+import com.example.taskplanning.entity.ActionLog;
+import com.example.taskplanning.repository.ActionLogRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+@Service
+public class LogService {
+    private static final Logger logger = LoggerFactory.getLogger(LogService.class);
+
+    private final ActionLogRepository actionLogRepository;
+
+    @Autowired
+    public LogService(ActionLogRepository actionLogRepository) {
+        this.actionLogRepository = actionLogRepository;
+    }
+
+    @Async("logTaskExecutor")
+    public void log(ActionLog actionLog) {
+        try {
+            actionLogRepository.save(actionLog);
+            logger.debug("ActionLog saved: {}", actionLog);
+        } catch (Exception e) {
+            logger.error("Failed to save ActionLog", e);
+        }
+    }
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\SecurityService.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- 
+package com.example.taskplanning.service;
+
+import com.example.taskplanning.entity.Task;
+import com.example.taskplanning.entity.User;
+import com.example.taskplanning.entity.UserClassRelation;
+import com.example.taskplanning.repository.TaskRepository;
+import com.example.taskplanning.repository.UserClassRelationRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+
+@Slf4j
+@Service("securityService") // 确保Bean的名字是 "securityService"
+@Transactional(readOnly = true) // 权限检查都是只读操作，在类级别开启只读事务
+public class SecurityService {
+
+    private final UserService userService;
+    private final UserClassRelationRepository userClassRelationRepository;
+    private final TaskRepository taskRepository; // <-- 1. 新增 TaskRepository 依赖
+
+    @Autowired
+    public SecurityService(UserService userService,
+                           UserClassRelationRepository userClassRelationRepository,
+                           TaskRepository taskRepository) { // <-- 2. 在构造函数中注入
+        this.userService = userService;
+        this.userClassRelationRepository = userClassRelationRepository;
+        this.taskRepository = taskRepository;
+    }
+
+    /**
+     * 【重构】检查当前用户是否是指定班级的成员
+     */
+    public boolean isClassMember(Long classId) {
+        try {
+            User currentUser = userService.getCurrentUserEntity();
+            // 在Repository中添加这个新方法，比原来的exists...更精确
+            return userClassRelationRepository.existsByUser_IdAndClassEntity_IdAndStatus(
+                    currentUser.getId(),
+                    classId,
+                    UserClassRelation.JoinStatus.APPROVED
+            );
+        } catch (Exception e) {
+            log.error("检查班级成员权限时出错: classId={}, userId={}", classId, getUserIdSafely(), e);
+            return false;
+        }
+    }
+
+    /**
+     * 【重构】检查当前用户是否可以管理指定班级（是否为ADMIN或OWNER）
+     */
+    public boolean canManageClass(Long classId) {
+        try {
+            User currentUser = userService.getCurrentUserEntity();
+            Optional<UserClassRelation> relationOpt = userClassRelationRepository
+                    .findByUser_IdAndClassEntity_IdAndStatus(
+                            currentUser.getId(),
+                            classId,
+                            UserClassRelation.JoinStatus.APPROVED
+                    );
+
+            if (relationOpt.isEmpty()) {
+                return false; // 不是成员，自然不能管理
+            }
+
+            UserClassRelation.RoleInClass role = relationOpt.get().getRole();
+            return role == UserClassRelation.RoleInClass.ADMIN || role == UserClassRelation.RoleInClass.OWNER;
+        } catch (Exception e) {
+            log.error("检查班级管理权限时出错: classId={}, userId={}", classId, getUserIdSafely(), e);
+            return false;
+        }
+    }
+
+    /**
+     * 【重构】检查当前用户是否是指定班级的创建者（Owner）
+     */
+    public boolean isClassOwner(Long classId) {
+        // 与 canManageClass 逻辑类似，但更严格
+        try {
+            User currentUser = userService.getCurrentUserEntity();
+            Optional<UserClassRelation> relationOpt = userClassRelationRepository
+                    .findByUser_IdAndClassEntity_IdAndStatus(
+                            currentUser.getId(),
+                            classId,
+                            UserClassRelation.JoinStatus.APPROVED
+                    );
+
+            return relationOpt.isPresent() && relationOpt.get().getRole() == UserClassRelation.RoleInClass.OWNER;
+        } catch (Exception e) {
+            log.error("检查班级创建者权限时出错: classId={}, userId={}", classId, getUserIdSafely(), e);
+            return false;
+        }
+    }
+
+    /**
+     * 【全新实现】检查当前用户是否可以访问（查看）指定任务
+     * 这是个人状态更新、查看任务详情等操作的基础权限
+     */
+    public boolean canAccessTask(Long taskId) {
+        try {
+            User currentUser = userService.getCurrentUserEntity();
+            Task task = taskRepository.findById(taskId).orElse(null);
+
+            if (task == null) {
+                return false; // 任务不存在，自然无权访问
+            }
+
+            if (task.getTaskType() == Task.TaskType.PERSONAL) {
+                // 如果是个人任务，只有创建者本人能访问
+                return task.getCreator().getId().equals(currentUser.getId());
+            } else if (task.getTaskType() == Task.TaskType.CLASS) {
+                // 如果是班级任务，需要是该班级的成员才能访问
+                if (task.getClassEntity() == null) return false; // 数据完整性保护
+                return isClassMember(task.getClassEntity().getId());
+            }
+            return false;
+        } catch (Exception e) {
+            log.error("检查任务访问权限时出错: taskId={}, userId={}", taskId, getUserIdSafely(), e);
+            return false;
+        }
+    }
+
+    /**
+     * 【全新实现】检查当前用户是否可以编辑或删除指定任务
+     */
+    public boolean canEditTask(Long taskId) {
+        try {
+            User currentUser = userService.getCurrentUserEntity();
+            Task task = taskRepository.findById(taskId).orElse(null);
+
+            if (task == null) {
+                return false;
+            }
+
+            if (task.getTaskType() == Task.TaskType.PERSONAL) {
+                // 个人任务，只有创建者能编辑
+                return task.getCreator().getId().equals(currentUser.getId());
+            } else if (task.getTaskType() == Task.TaskType.CLASS) {
+                // 班级任务，只有班级管理员能编辑
+                if (task.getClassEntity() == null) return false;
+                return canManageClass(task.getClassEntity().getId());
+            }
+            return false;
+        } catch (Exception e) {
+            log.error("检查任务编辑权限时出错: taskId={}, userId={}", taskId, getUserIdSafely(), e);
+            return false;
+        }
+    }
+
+    /**
+     * 一个安全的辅助方法，用于在日志中获取用户ID，避免空指针
+     */
+    private Long getUserIdSafely() {
+        try {
+            return userService.getCurrentUserEntity().getId();
+        } catch (Exception e) {
+            return null; // 如果获取用户失败，返回null
+        }
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\SyncService.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- 
+package com.example.taskplanning.service;
+
+import com.example.taskplanning.dto.SyncResultDto;
+import com.example.taskplanning.entity.Task;
+import com.example.taskplanning.entity.User;
+import com.example.taskplanning.entity.UserTaskRelation;
+import com.example.taskplanning.repository.TaskRepository;
+import com.example.taskplanning.repository.UserTaskRelationRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.example.taskplanning.annotation.LogAction;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+@Service
+public class SyncService {
+
+    @Autowired
+    private TaskRepository taskRepository;
+
+    @Autowired
+    private UserTaskRelationRepository userTaskRelationRepository;
+
+    @Autowired
+    private UserService userService;
+
+    /**
+     * 为用户智能同步指定班级在指定时间范围内的任务
+     * @param classId 班级ID
+     * @param range 时间范围
+     * @return 同步结果
+     */
+    @Transactional
+    @LogAction(action = "TASK_SYNC", entityType = "CLASS")
+    public SyncResultDto syncClassTasks(Long classId, String range) {
+        // 1. 获取当前登录用户
+        User currentUser = userService.getCurrentUserEntity();
+
+        // 2. 计算时间范围
+        LocalDateTime startTime = calculateStartTime(range);
+
+        // 3. 第一轮筛选：获取班级在指定时间范围内的所有任务ID
+        List<Long> candidateTaskIds = taskRepository.findTaskIdsByClassIdAndCreatedAtAfter(classId, startTime);
+
+        // 4. 获取用户已关联的任务ID列表
+        List<Long> existingTaskIds = userTaskRelationRepository.findTaskIdsByUserId(currentUser.getId());
+
+        // 5. 计算差集：找出需要新增关联的任务ID
+        Set<Long> existingTaskIdSet = new HashSet<>(existingTaskIds);
+        List<Long> newTaskIdsToSync = new ArrayList<>();
+
+        for (Long taskId : candidateTaskIds) {
+            if (!existingTaskIdSet.contains(taskId)) {
+                newTaskIdsToSync.add(taskId);
+            }
+        }
+
+        // 6. 批量创建关联
+        if (!newTaskIdsToSync.isEmpty()) {
+            List<UserTaskRelation> newRelations = new ArrayList<>();
+
+            for (Long taskId : newTaskIdsToSync) {
+                // 创建任务引用对象，JPA会处理延迟加载
+                Task taskReference = taskRepository.getReferenceById(taskId);
+
+                UserTaskRelation relation = new UserTaskRelation();
+                relation.setUser(currentUser);
+                relation.setTask(taskReference);
+                relation.setStatus(UserTaskRelation.TaskStatus.TODO); // 默认状态
+
+                // 🔥 关键修复：根据业务规则三，设置personal_deadline的默认值
+                // 将任务的官方deadline作为用户个人计划的初始值
+                relation.setPersonalDeadline(taskReference.getDeadline());
+
+                relation.setCreatedAt(LocalDateTime.now());
+                relation.setUpdatedAt(LocalDateTime.now());
+
+                newRelations.add(relation);
+            }
+
+            // 批量保存
+            userTaskRelationRepository.saveAll(newRelations);
+        }
+
+        // 7. 构建并返回结果
+        return new SyncResultDto(
+                newTaskIdsToSync.size(),
+                range,
+                candidateTaskIds.size()
+        );
+    }
+
+    /**
+     * 根据范围字符串计算开始时间
+     * @param range 时间范围
+     * @return 开始时间
+     */
+    private LocalDateTime calculateStartTime(String range) {
+        LocalDateTime now = LocalDateTime.now();
+
+        switch (range.toLowerCase()) {
+            case "day":
+                return now.minusDays(1);
+            case "week":
+                return now.minusWeeks(1);
+            case "month":
+                return now.minusMonths(1);
+            case "semester":
+                return now.minusMonths(6);
+            case "year":
+                return now.minusYears(1);
+            default:
+                throw new IllegalArgumentException("不支持的时间范围: " + range);
+        }
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\TaskService.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- 
+// 9. TaskService.java - 任务业务逻辑服务
+package com.example.taskplanning.service;
+
+import com.example.taskplanning.dto.CalendarTaskDto;
+import com.example.taskplanning.dto.TaskCreateDto;
+import com.example.taskplanning.dto.TaskResponseDto;
+import com.example.taskplanning.dto.TaskStatusUpdateDto;
+import com.example.taskplanning.entity.*;
+import com.example.taskplanning.exception.BusinessException;
+import com.example.taskplanning.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import com.example.taskplanning.annotation.LogAction;
+
+@Service
+@Transactional
+public class TaskService {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TaskService.class);
+
+    private final TaskRepository taskRepository;
+    private final UserTaskRelationRepository userTaskRelationRepository;
+    private final UserClassRelationRepository userClassRelationRepository;
+    private final ClassRepository classRepository;
+    private final UserService userService;
+
+    @Autowired
+    public TaskService(TaskRepository taskRepository,
+                       UserTaskRelationRepository userTaskRelationRepository,
+                       UserClassRelationRepository userClassRelationRepository,
+                       ClassRepository classRepository,
+                       UserService userService) {
+        this.taskRepository = taskRepository;
+        this.userTaskRelationRepository = userTaskRelationRepository;
+        this.userClassRelationRepository = userClassRelationRepository;
+        this.classRepository = classRepository;
+        this.userService = userService;
+    }
+
+    /**
+     * 创建个人任务
+     */
+    @LogAction(action = "TASK_CREATE_PERSONAL", entityType = "TASK")
+    public TaskResponseDto createPersonalTask(TaskCreateDto createDto) {
+        User currentUser = userService.getCurrentUserEntity();
+
+        Task task = new Task();
+        task.setTitle(createDto.getTitle());
+        task.setDescription(createDto.getDescription());
+        task.setCourseName(createDto.getCourseName());
+        task.setTaskType(Task.TaskType.PERSONAL);
+        task.setDeadline(createDto.getDeadline());
+        task.setCreator(currentUser);
+        task.setClassEntity(null); // 个人任务无关联班级
+
+        Task savedTask = taskRepository.save(task);
+        return convertToResponseDto(savedTask, null);
+    }
+
+    /**
+     * 创建班级任务
+     */
+    @LogAction(action = "TASK_CREATE_CLASS", entityType = "TASK")
+    public TaskResponseDto createClassTask(Long classId, TaskCreateDto createDto) {
+        User currentUser = userService.getCurrentUserEntity();
+
+        // 验证班级存在
+        Classes classEntity = classRepository.findById(classId)
+                .orElseThrow(() -> new BusinessException("CLASS_NOT_FOUND", "班级不存在"));
+
+        Task task = new Task();
+        task.setTitle(createDto.getTitle());
+        task.setDescription(createDto.getDescription());
+        task.setCourseName(createDto.getCourseName());
+        task.setTaskType(Task.TaskType.CLASS);
+        task.setDeadline(createDto.getDeadline());
+        task.setCreator(currentUser);
+        task.setClassEntity(classEntity);
+
+        Task savedTask = taskRepository.save(task);
+        return convertToResponseDto(savedTask, null);
+    }
+
+    /**
+     * 获取日历视图数据
+     * 严格遵循"用户自主控制"原则：只显示用户主动关联的任务
+     */
+    @Transactional(readOnly = true)
+    public List<CalendarTaskDto> getCalendarTasks(int year, int month) {
+        User currentUser = userService.getCurrentUserEntity();
+
+        YearMonth yearMonth = YearMonth.of(year, month);
+        LocalDateTime startDate = yearMonth.atDay(1).atStartOfDay();
+        LocalDateTime endDate = yearMonth.atEndOfMonth().atTime(23, 59, 59);
+
+        // 使用修正后的查询方法，确保只返回用户主动关联的任务
+        List<Task> tasks = taskRepository.findUserRelatedTasksInDateRange(
+                currentUser.getId(), startDate, endDate);
+
+        // 获取用户的所有任务关系，用于填充个人状态
+        Map<Long, UserTaskRelation> userRelations = userTaskRelationRepository
+                .findByUserId(currentUser.getId())
+                .stream()
+                .collect(Collectors.toMap(
+                        relation -> relation.getTask().getId(),
+                        relation -> relation
+                ));
+
+        return tasks.stream()
+                .map(task -> convertToCalendarDto(task, userRelations.get(task.getId())))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取班级任务列表
+     */
+    @Transactional(readOnly = true)
+    public Page<TaskResponseDto> getClassTasks(Long classId, Pageable pageable) {
+        User currentUser = userService.getCurrentUserEntity();
+
+        Page<Task> tasks = taskRepository.findByClassEntityIdAndIsDeletedFalseOrderByDeadlineAsc(classId, pageable);
+
+        // 获取用户的任务关系映射
+        Map<Long, UserTaskRelation> userRelations = userTaskRelationRepository
+                .findByUserId(currentUser.getId())
+                .stream()
+                .collect(Collectors.toMap(
+                        relation -> relation.getTask().getId(),
+                        relation -> relation
+                ));
+
+        return tasks.map(task -> convertToResponseDto(task, userRelations.get(task.getId())));
+    }
+
+    /**
+     * 更新任务的个人状态
+     * 🔥 修复：明确区分个人任务和班级任务的处理逻辑
+     */
+    public TaskResponseDto updateTaskStatus(Long taskId, TaskStatusUpdateDto statusUpdateDto) {
+        User currentUser = userService.getCurrentUserEntity();
+
+        // 验证用户是否可以访问该任务
+        Task task = taskRepository.findAccessibleTaskByUserAndTaskId(currentUser.getId(), taskId);
+        if (task == null) {
+            throw new BusinessException("TASK_NOT_ACCESSIBLE", "无权访问该任务");
+        }
+
+        // 统一通过关系表管理所有任务的个人状态
+        // 个人任务和班级任务都使用相同的逻辑，因为本质上都是"用户对任务的个人化设定"
+        return updateUserTaskRelation(currentUser, task, statusUpdateDto);
+    }
+    /**
+     * 获取任务详情
+     */
+    @Transactional(readOnly = true)
+    public TaskResponseDto getTaskDetail(Long taskId) {
+        User currentUser = userService.getCurrentUserEntity();
+
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new BusinessException("TASK_NOT_FOUND", "任务不存在"));
+        // 如果任务已删除，直接返回不存在
+        if (task.isDeleted()) {
+            throw new BusinessException("TASK_NOT_FOUND", "任务不存在");
+        }
+
+        // 检查用户是否可以访问该任务
+        if (!canUserAccessTask(currentUser.getId(), taskId)) {
+            throw new BusinessException("TASK_NOT_ACCESSIBLE", "无权访问该任务");
+        }
+
+
+        UserTaskRelation relation = userTaskRelationRepository
+                .findByUserIdAndTaskId(currentUser.getId(), taskId)
+                .orElse(null);
+
+        return convertToResponseDto(task, relation);
+    }
+
+    /**
+     * 更新或创建用户任务关系
+     * 🔥 修复：确保新建关系时正确设置personal_deadline默认值
+     */
+    private TaskResponseDto updateUserTaskRelation(User user, Task task, TaskStatusUpdateDto statusUpdateDto) {
+        UserTaskRelation relation = userTaskRelationRepository
+                .findByUserIdAndTaskId(user.getId(), task.getId())
+                .orElseGet(() -> {
+                    UserTaskRelation newRelation = new UserTaskRelation();
+                    newRelation.setUser(user);
+                    newRelation.setTask(task);
+
+                    // 🔥 关键修复：为新建的关系设置personal_deadline默认值
+                    // 这处理了"手动导入"任务到个人日历的场景
+                    if (newRelation.getPersonalDeadline() == null) {
+                        newRelation.setPersonalDeadline(task.getDeadline());
+                    }
+
+                    return newRelation;
+                });
+        // Log before update
+        try { logger.info("updateUserTaskRelation before: taskId={} relationId={} personalDeadline={} status={}", task.getId(), relation.getId(), relation.getPersonalDeadline(), relation.getStatus()); } catch (Exception e) {}
+
+        // 更新用户提供的字段
+        relation.setStatus(statusUpdateDto.getStatus());
+
+        // 只有当用户明确提供了personal_deadline时才更新，否则保持现有值
+        if (statusUpdateDto.getPersonalDeadline() != null) {
+            relation.setPersonalDeadline(statusUpdateDto.getPersonalDeadline());
+        }
+
+        relation.setPersonalNotes(statusUpdateDto.getPersonalNotes());
+
+        // 如果状态是DONE，记录完成时间
+        if (statusUpdateDto.getStatus() == UserTaskRelation.TaskStatus.DONE) {
+            relation.setCompletedAt(LocalDateTime.now());
+        } else {
+            relation.setCompletedAt(null);
+        }
+
+        UserTaskRelation savedRelation = userTaskRelationRepository.save(relation);
+
+        // Log after save
+        try { logger.info("updateUserTaskRelation after: taskId={} relationId={} personalDeadline={} status={}", task.getId(), savedRelation.getId(), savedRelation.getPersonalDeadline(), savedRelation.getStatus()); } catch (Exception e) {}
+
+        return convertToResponseDto(task, savedRelation);
+    }
+
+    /**
+     * 检查用户是否可以访问任务
+     */
+    @Transactional(readOnly = true)
+    public boolean canUserAccessTask(Long userId, Long taskId) {
+        Task task = taskRepository.findAccessibleTaskByUserAndTaskId(userId, taskId);
+        return task != null;
+    }
+
+    /**
+     * 转换为响应DTO
+     */
+    private TaskResponseDto convertToResponseDto(Task task, UserTaskRelation relation) {
+        TaskResponseDto dto = new TaskResponseDto();
+        dto.setId(task.getId());
+        dto.setTitle(task.getTitle());
+        dto.setDescription(task.getDescription());
+        dto.setCourseName(task.getCourseName());
+        dto.setTaskType(task.getTaskType());
+        dto.setDeadline(task.getDeadline());
+        dto.setCreatedAt(task.getCreatedAt());
+        dto.setUpdatedAt(task.getUpdatedAt());
+
+        dto.setCreatorId(task.getCreator().getId());
+        dto.setCreatorName(task.getCreator().getName());
+
+        if (task.getClassEntity() != null) {
+            dto.setClassId(task.getClassEntity().getId());
+            dto.setClassName(task.getClassEntity().getName());
+        }
+
+        if (relation != null) {
+            dto.setPersonalStatus(relation.getStatus());
+            dto.setPersonalDeadline(relation.getPersonalDeadline());
+            dto.setPersonalNotes(relation.getPersonalNotes());
+            dto.setCompletedAt(relation.getCompletedAt());
+        } else {
+            dto.setPersonalStatus(UserTaskRelation.TaskStatus.TODO);
+        }
+
+        return dto;
+    }
+
+    /**
+     * 转换为日历DTO
+     */
+    private CalendarTaskDto convertToCalendarDto(Task task, UserTaskRelation relation) {
+        CalendarTaskDto dto = new CalendarTaskDto();
+        dto.setId(task.getId());
+        dto.setTitle(task.getTitle());
+        dto.setCourseName(task.getCourseName());
+        dto.setTaskType(task.getTaskType());
+        dto.setDeadline(task.getDeadline());
+        dto.setCreatedAt(task.getCreatedAt());
+
+        if (task.getClassEntity() != null) {
+            dto.setClassName(task.getClassEntity().getName());
+        }
+
+        if (relation != null) {
+            dto.setPersonalStatus(relation.getStatus());
+            dto.setPersonalDeadline(relation.getPersonalDeadline());
+        } else {
+            dto.setPersonalStatus(UserTaskRelation.TaskStatus.TODO);
+        }
+
+        return dto;
+    }
+    /**
+     * 获取用户的个人任务列表
+     */
+    @Transactional(readOnly = true)
+    public Page<TaskResponseDto> getPersonalTasks(Pageable pageable) {
+        User currentUser = userService.getCurrentUserEntity();
+
+        Page<Task> tasks = taskRepository.findByCreatorIdAndTaskTypeAndIsDeletedFalseOrderByDeadlineAsc(
+                currentUser.getId(), Task.TaskType.PERSONAL, pageable);
+
+        // 获取用户的任务关系映射
+        Map<Long, UserTaskRelation> userRelations = userTaskRelationRepository
+                .findByUserId(currentUser.getId())
+                .stream()
+                .collect(Collectors.toMap(
+                        relation -> relation.getTask().getId(),
+                        relation -> relation
+                ));
+
+        return tasks.map(task -> convertToResponseDto(task, userRelations.get(task.getId())));
+    }
+
+    /**
+     * 删除任务（软删除）
+     * 🔥 修复：完善班级任务的删除权限校验逻辑
+     */
+    public void deleteTask(Long taskId) {
+        User currentUser = userService.getCurrentUserEntity();
+
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new BusinessException("TASK_NOT_FOUND", "任务不存在"));
+
+        // 🔥 关键修复：根据业务规则二，完善删除权限校验
+        boolean hasPermission = false;
+
+        if (task.getTaskType() == Task.TaskType.PERSONAL) {
+            // 个人任务：仅创建者可删除
+            hasPermission = task.getCreator().getId().equals(currentUser.getId());
+        } else if (task.getTaskType() == Task.TaskType.CLASS) {
+            // 班级任务：创建者或该班级的ADMIN/OWNER可删除
+            if (task.getCreator().getId().equals(currentUser.getId())) {
+                hasPermission = true;
+            } else {
+                // 检查是否为班级管理员
+                Long classId = task.getClassEntity().getId();
+                hasPermission = userClassRelationRepository.hasAdminPermission(currentUser.getId(), classId);
+            }
+        }
+
+        if (!hasPermission) {
+            throw new BusinessException("TASK_DELETE_FORBIDDEN", "无权删除该任务");
+        }
+
+        task.setDeleted(true);
+        taskRepository.save(task);
+    }
+
+    /**
+     * 更新任务信息（仅创建者或有权限的管理员可操作）
+     * 🔥 修复：完善班级任务的权限校验逻辑
+     */
+    public TaskResponseDto updateTask(Long taskId, TaskCreateDto updateDto) {
+        User currentUser = userService.getCurrentUserEntity();
+
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new BusinessException("TASK_NOT_FOUND", "任务不存在"));
+
+        // 🔥 关键修复：根据业务规则二，完善权限校验
+        boolean hasPermission = false;
+
+        if (task.getTaskType() == Task.TaskType.PERSONAL) {
+            // 个人任务：仅创建者可修改
+            hasPermission = task.getCreator().getId().equals(currentUser.getId());
+        } else if (task.getTaskType() == Task.TaskType.CLASS) {
+            // 班级任务：创建者或该班级的ADMIN/OWNER可修改
+            if (task.getCreator().getId().equals(currentUser.getId())) {
+                hasPermission = true;
+            } else {
+                // 检查是否为班级管理员
+                Long classId = task.getClassEntity().getId();
+                hasPermission = userClassRelationRepository.hasAdminPermission(currentUser.getId(), classId);
+            }
+        }
+
+        if (!hasPermission) {
+            throw new BusinessException("TASK_UPDATE_FORBIDDEN", "无权修改该任务");
+        }
+
+        // 执行更新
+        task.setTitle(updateDto.getTitle());
+        task.setDescription(updateDto.getDescription());
+        task.setCourseName(updateDto.getCourseName());
+        task.setDeadline(updateDto.getDeadline());
+
+        Task savedTask = taskRepository.save(task);
+
+        UserTaskRelation relation = userTaskRelationRepository
+                .findByUserIdAndTaskId(currentUser.getId(), taskId)
+                .orElse(null);
+
+        return convertToResponseDto(savedTask, relation);
+    }
+
+}
+--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---
+
+C:\Users\a\Desktop\Project\task-planning-system>(echo.   && echo --- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---   && type "C:\Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\UserService.java"   && echo --- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- ) 
+ 
+--- START OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ --- 
+// UserService.java (V2.0 - 重构版)
+package com.example.taskplanning.service;
+
+import com.example.taskplanning.JwtTokenProvider;
+import com.example.taskplanning.config.CustomUserDetails;
+import com.example.taskplanning.dto.LoginRequestDto;
+import com.example.taskplanning.dto.LoginResponseDto;
+import com.example.taskplanning.dto.UserRegistrationDto;
+import com.example.taskplanning.dto.UserResponseDto;
+import com.example.taskplanning.entity.User;
+import com.example.taskplanning.exception.BusinessException;
+import com.example.taskplanning.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.example.taskplanning.annotation.LogAction;
+import java.time.LocalDateTime;
+import java.util.Collections;
+
+@Service
+public class UserService implements UserDetailsService { // <-- 1. 实现 UserDetailsService 接口
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final AuthenticationManager authenticationManager;
+
+    // 使用构造函数注入，这是Spring推荐的最佳实践
+    @Autowired
+    public UserService(UserRepository userRepository,
+                       @Lazy PasswordEncoder passwordEncoder, // 使用@Lazy解决潜在的循环依赖
+                       JwtTokenProvider jwtTokenProvider,
+                       @Lazy AuthenticationManager authenticationManager) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.authenticationManager = authenticationManager;
+    }
+
+    /**
+     * 【Spring Security 核心方法】
+     * 根据用户名加载用户详情，用于认证过程
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
+
+        // 返回自定义的CustomUserDetails对象，包含用户ID
+        return new CustomUserDetails(
+                user.getId(),           // 用户ID - 供@PreAuthorize使用
+                user.getUsername(),     // 用户名
+                user.getPassword(),     // 密码
+                Collections.singletonList(new SimpleGrantedAuthority("USER")) // 基础权限
+        );
+    }
+
+    /**
+     * 用户注册
+     */
+    @Transactional
+    @LogAction(action = "USER_REGISTER", entityType = "USER")
+    public UserResponseDto registerUser(UserRegistrationDto registrationDto) {
+        if (userRepository.existsByUsername(registrationDto.getUsername())) {
+            throw new BusinessException("USERNAME_EXISTS", "用户名已存在");
+        }
+        if (userRepository.existsByEmail(registrationDto.getEmail())) {
+            throw new BusinessException("EMAIL_EXISTS", "邮箱已被注册");
+        }
+
+        User user = new User();
+        user.setUsername(registrationDto.getUsername());
+        user.setEmail(registrationDto.getEmail());
+        user.setPassword(passwordEncoder.encode(registrationDto.getPassword())); // <-- 使用注入的PasswordEncoder
+        user.setName(registrationDto.getName());
+        user.setPhone(registrationDto.getPhone());
+        // ... 其他属性 ...
+
+        User savedUser = userRepository.save(user);
+        return convertToResponseDto(savedUser);
+    }
+
+    /**
+     * 用户登录
+     */
+    @Transactional
+    @LogAction(action = "USER_LOGIN", entityType = "USER")
+    public LoginResponseDto loginUser(LoginRequestDto loginRequest) {
+        // 1. 使用AuthenticationManager进行认证
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginRequest.getUsername(),
+                        loginRequest.getPassword()
+                )
+        );
+
+        // 2. 将认证信息存入SecurityContext
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        // 3. 生成JWT Token
+        String token = jwtTokenProvider.generateToken(authentication);
+
+        // 4. 更新最后登录时间
+        User user = userRepository.findByUsername(loginRequest.getUsername()).get();
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        return new LoginResponseDto(token, "Bearer", jwtTokenProvider.getJwtExpirationInMs());
+    }
+
+
+    /**
+     * 获取当前已认证用户的 User 实体对象 (供内部Service调用)
+     */
+    public User getCurrentUserEntity() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Authenticated user not found in database: " + username));
+    }
+
+    /**
+     * 获取当前已认证用户的 DTO 对象 (供Controller调用)
+     */
+    public UserResponseDto getCurrentUserDto() {
+        return convertToResponseDto(getCurrentUserEntity());
+    }
+
+    /**
+     * 将User实体转换为UserResponseDto
+     */
+    private UserResponseDto convertToResponseDto(User user) {
+        UserResponseDto dto = new UserResponseDto();
+        dto.setId(user.getId());
+        dto.setUsername(user.getUsername());
+        dto.setEmail(user.getEmail());
+        dto.setName(user.getName());
+        dto.setEmailVerified(user.isEmailVerified());
+        dto.setLastLoginAt(user.getLastLoginAt());
+        dto.setCreatedAt(user.getCreatedAt());
+        return dto;
+    }
+}--- END OF FILE \Users\a\Desktop\Project\task-planning-system\src\main\java\com\example\taskplanning\service\ ---

@@ -1,0 +1,171 @@
+### ===================================================================
+### 02 - 班级管理与权限测试
+###
+### 前置条件: 必须先运行 01_setup_and_auth.http 并填充好环境文件
+### ===================================================================
+
+### 1. 创建者(creator)创建班级1
+# @name createClass1
+POST {{host}}/api/classes
+Authorization: {{creator_token}}
+Content-Type: application/json
+
+{
+  "name": "软件工程2024班",
+  "description": "软件工程专业2024级主班级"
+}
+
+###
+# !!! 手动操作: 运行完此请求后, 将响应中的班级ID (如1) 填入环境文件的 "class1_id" 字段 !!!
+###
+
+### 2. 管理员(admin)申请加入班级1
+POST {{host}}/api/classes/{{class1_id}}/join
+Authorization: {{admin_token}}
+Content-Type: application/json
+
+{ "joinReason": "申请成为本班助教" }
+
+###
+
+### 3. 创建者(creator)获取待审批列表 (应该能看到admin)
+GET {{host}}/api/classes/{{class1_id}}/approvals
+Authorization: {{creator_token}}
+
+###
+
+### 4. 创建者(creator)批准管理员(admin)的申请
+# @name adminInfo
+# 假设admin用户的ID是2, 请根据实际情况在数据库中确认
+PUT {{host}}/api/classes/{{class1_id}}/approvals/23
+Authorization: {{creator_token}}
+Content-Type: application/json
+
+{ "action": "APPROVE" }
+
+###
+
+### 5. 创建者(creator)将admin提升为管理员
+
+PUT {{host}}/api/classes/{{class1_id}}/members/23/promote
+Authorization: {{creator_token}}
+
+###
+
+### 6. 普通成员(memberA)尝试将admin降级 (预期失败, 403 Forbidden)
+
+PUT {{host}}/api/classes/{{class1_id}}/members/23/demote
+Authorization: {{memberA_token}}
+
+###
+
+### 7. 创建者(creator)查看自己的班级列表 (解决你的403问题)
+# 这个请求现在应该能成功, 如果还是403, 说明SecurityService.isClassMember或相关逻辑有bug
+GET {{host}}/api/classes/my
+Authorization: {{memberA_token}}
+
+###
+###
+GET {{host}}/api/classes/{{class1_id}}/members
+Authorization: {{memberA_token}}
+###
+
+### 8. 获取班级1的成员列表 (应该包含creator和admin)
+GET {{host}}/api/classes/{{class1_id}}/members
+Authorization: {{admin_token}}
+
+#多班级越权测试
+
+### 9. 用户B创建班级2
+# @name createClass2
+POST {{host}}/api/classes
+Authorization: {{memberB_token}}
+Content-Type: application/json
+
+{
+  "name": "计算机科学与技术1班",
+  "description": "计算机科学与技术专业2023级主班级"
+}
+
+###
+### 10. 管理员(admin)申请加入班级2
+POST {{host}}/api/classes/{{class2_id}}/join
+Authorization: {{admin_token}}
+Content-Type: application/json
+
+{ "joinReason": "申请成为本班助教" }
+
+###
+
+### 11. 创建者(用户B)获取待审批列表 (应该能看到admin)
+GET {{host}}/api/classes/{{class2_id}}/approvals
+Authorization: {{memberB_token}}
+
+###
+
+### 12. 创建者(用户B)批准管理员(admin)的申请
+# @name adminInfo
+# 假设admin用户的ID是23, 请根据实际情况在数据库中确认
+PUT {{host}}/api/classes/{{class2_id}}/approvals/23
+Authorization: {{memberB_token}}
+Content-Type: application/json
+
+{ "action": "APPROVE" }
+
+###
+### 13. 用户A申请加入班级1
+POST {{host}}/api/classes/{{class1_id}}/join
+Authorization: {{memberA_token}}
+Content-Type: application/json
+
+{ "joinReason": "申请成为本班成员" }
+
+###
+
+### 14. 管理员批准用户A的申请
+# @name adminInfo
+# 假设admin用户的ID是23, 请根据实际情况在数据库中确认
+PUT {{host}}/api/classes/{{class1_id}}/approvals/24
+Authorization: {{admin_token}}
+Content-Type: application/json
+
+{ "action": "APPROVE" }
+
+###
+### 15. 用户A申请加入班级2
+POST {{host}}/api/classes/{{class2_id}}/join
+Authorization: {{memberA_token}}
+Content-Type: application/json
+
+{ "joinReason": "申请成为本班成员" }
+
+###
+### 15. 管理员批准用户A的申请（不成功）
+# @name adminInfo
+# 假设admin用户的ID是23, 请根据实际情况在数据库中确认
+PUT {{host}}/api/classes/{{class2_id}}/approvals/24
+Authorization: {{admin_token}}
+Content-Type: application/json
+
+{ "action": "APPROVE" }
+
+###
+
+### 16. 创建者(用户B)批准用户A的申请
+# @name adminInfo
+# 假设admin用户的ID是23, 请根据实际情况在数据库中确认
+PUT {{host}}/api/classes/{{class2_id}}/approvals/24
+Authorization: {{memberB_token}}
+Content-Type: application/json
+
+{ "action": "APPROVE" }
+
+###
+### 8. 获取班级2的成员列表 (应该包含creator和admin)
+GET {{host}}/api/classes/{{class2_id}}/members
+Authorization: {{memberB_token}}
+###
+
+#截至目前====创建者=====管理员===普通成员
+#class1===creator====admin===memberA
+#class2===memberB====null ===admin.memberA

@@ -1,0 +1,55 @@
+// 5. CalendarTaskDto.java - 日历视图任务DTO
+package com.example.taskplanning.dto;
+
+import com.example.taskplanning.entity.Task;
+import com.example.taskplanning.entity.UserTaskRelation;
+import java.time.LocalDateTime;
+
+public class CalendarTaskDto {
+
+    private Long id;
+    private String title;
+    private String description;
+    private String courseName;
+    private Task.TaskType taskType;
+    private LocalDateTime deadline;
+    private LocalDateTime createdAt;
+
+    // 个人状态
+    private UserTaskRelation.TaskStatus personalStatus;
+    private LocalDateTime personalDeadline;
+
+    // 班级信息（如果是班级任务）
+    private String className;
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public String getCourseName() { return courseName; }
+    public void setCourseName(String courseName) { this.courseName = courseName; }
+
+    public Task.TaskType getTaskType() { return taskType; }
+    public void setTaskType(Task.TaskType taskType) { this.taskType = taskType; }
+
+    public LocalDateTime getDeadline() { return deadline; }
+    public void setDeadline(LocalDateTime deadline) { this.deadline = deadline; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public UserTaskRelation.TaskStatus getPersonalStatus() { return personalStatus; }
+    public void setPersonalStatus(UserTaskRelation.TaskStatus personalStatus) { this.personalStatus = personalStatus; }
+
+    public LocalDateTime getPersonalDeadline() { return personalDeadline; }
+    public void setPersonalDeadline(LocalDateTime personalDeadline) { this.personalDeadline = personalDeadline; }
+
+    public String getClassName() { return className; }
+    public void setClassName(String className) { this.className = className; }
+}

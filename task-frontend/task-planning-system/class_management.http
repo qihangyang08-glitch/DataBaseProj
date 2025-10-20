@@ -1,0 +1,91 @@
+### ===================================================================
+### 班级管理模块 API 测试
+### ===================================================================
+
+### !!! 前置准备：请在这里手动粘贴你登录后获取的JWT Token !!!
+@jwt_token = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlciIsImlhdCI6MTc1Njc5ODkwMiwiZXhwIjoxNzU2ODg1MzAyfQ.cW-FjxaM_GwCYaZ0QVYHas-VWtGhwZ7yFNEanU5mmqk
+### -------------------------------------------------------------------
+### 场景一：用户A (testuser) 创建并管理班级
+### -------------------------------------------------------------------
+
+### 1. 用户A 创建一个私有的、需要审批的班级
+# @name createClassRequest
+POST http://localhost:8080/api/classes
+Authorization: {{jwt_token}}
+Content-Type: application/json
+
+{
+  "name": "计算机网络学习小组",
+  "description": "这是计网课程的学习小组，用于发布作业和讨论。",
+  "isPublic": false,
+  "joinApprovalRequired": true
+}
+
+###
+
+### 2. (暂存) 从上一步的响应中获取新创建的班级ID
+@classId = 3
+
+
+### 3. 用户A 查看自己创建的班级列表 (应该能看到刚才创建的)
+GET http://localhost:8080/api/classes/my
+Authorization: {{jwt_token}}
+
+###
+
+### 4. 使用邀请码搜索刚才创建的班级
+@inviteCode = 0HYY6VXS
+GET http://localhost:8080/api/classes/search?inviteCode={{inviteCode}}
+Authorization: {{jwt_token}}
+
+### -------------------------------------------------------------------
+### 场景二：用户B (需要你先注册一个新用户，如 "testuser2") 申请加入
+### -------------------------------------------------------------------
+
+### !!! 前置准备：请在这里手动粘贴 用户B (testuser2) 登录后获取的JWT !!!
+@jwt_token_user_b = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlckIiLCJpYXQiOjE3NTY3ODUzOTAsImV4cCI6MTc1Njg3MTc5MH0.kJ48xFw2qd4oi-lVWNhCjEtnBXUxXilC1ULBxoZUFMk
+
+
+### 5. 用户B 使用邀请码申请加入班级
+POST http://localhost:8080/api/classes/3/join
+Authorization: {{jwt_token_user_b}}
+Content-Type: application/json
+
+{
+  "joinReason": "你好，我是计网班的学生，希望加入小组一起学习。"
+}
+
+###
+
+### 6. (失败测试) 用户B 尝试查看待审批列表 (预期返回 403 Forbidden)
+GET http://localhost:8080/api/classes/{{classId}}/approvals
+Authorization: {{jwt_token_user_b}}
+
+### -------------------------------------------------------------------
+### 场景三：用户A (管理员) 审批 用户B 的申请
+### -------------------------------------------------------------------
+
+### 7. 用户A 查看待审批列表 (应该能看到用户B的申请)
+GET http://localhost:8080/api/classes/3/approvals
+Authorization: {{jwt_token}}
+
+###
+
+### 8. (暂存) 从上一步获取 用户B 的ID (你需要手动查看响应并填写)
+@userBId = 5  // <-- !!! 假设testuser2的ID是2，请根据实际情况修改 !!!
+
+
+### 9. 用户A 批准 用户B 的加入申请
+PUT http://localhost:8080/api/classes/3/approvals/5
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlciIsImlhdCI6MTc1Njc4Nzg3MywiZXhwIjoxNzU2ODc0MjczfQ.VhBaGqFdX3xYwpEzP6061STGBBCS7l-o8-SbRC6UyEU
+Content-Type: application/json
+
+{
+  "action": "APPROVE"
+}
+
+###
+
+### 10. 用户B 查看自己的班级列表 (现在应该能看到已成功加入的班级)
+GET http://localhost:8080/api/classes/my
+Authorization: {{jwt_token_user_b}}

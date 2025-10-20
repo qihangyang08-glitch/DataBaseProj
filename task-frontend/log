@@ -1,0 +1,248 @@
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.avatar_url,
+        u1_0.created_at,
+        u1_0.email,
+        u1_0.email_verified,
+        u1_0.language,
+        u1_0.last_login_at,
+        u1_0.name,
+        u1_0.notification_settings,
+        u1_0.password,
+        u1_0.phone,
+        u1_0.updated_at,
+        u1_0.username 
+    from
+        users u1_0 
+    where
+        u1_0.username=?
+2025-09-13T17:14:58.885+08:00  INFO 14172 --- [io-8080-exec-10] c.e.t.controller.TaskController          : updateTaskStatus called for taskId=21 status=TODO personalDeadline=2025-10-08T23:59
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.avatar_url,
+        u1_0.created_at,
+        u1_0.email,
+        u1_0.email_verified,
+        u1_0.language,
+        u1_0.last_login_at,
+        u1_0.name,
+        u1_0.notification_settings,
+        u1_0.password,
+        u1_0.phone,
+        u1_0.updated_at,
+        u1_0.username 
+    from
+        users u1_0 
+    where
+        u1_0.username=?
+Hibernate: 
+    select
+        t1_0.id,
+        t1_0.class_id,
+        t1_0.course_name,
+        t1_0.created_at,
+        t1_0.creator_id,
+        t1_0.deadline,
+        t1_0.description,
+        t1_0.is_deleted,
+        t1_0.task_type,
+        t1_0.title,
+        t1_0.updated_at 
+    from
+        tasks t1_0 
+    where
+        t1_0.id=? 
+        and t1_0.is_deleted=0 
+        and (
+            (
+                t1_0.task_type='PERSONAL' 
+                and t1_0.creator_id=?
+            ) 
+            or (
+                t1_0.task_type='CLASS' 
+                and exists(select
+                    1 
+                from
+                    user_task_relations utr1_0 
+                where
+                    utr1_0.task_id=t1_0.id 
+                    and utr1_0.user_id=?)
+            )
+        )
+Hibernate: 
+    select
+        utr1_0.id,
+        utr1_0.completed_at,
+        utr1_0.created_at,
+        utr1_0.personal_deadline,
+        utr1_0.personal_notes,
+        utr1_0.status,
+        utr1_0.task_id,
+        utr1_0.updated_at,
+        utr1_0.user_id 
+    from
+        user_task_relations utr1_0 
+    left join
+        users u1_0 
+            on u1_0.id=utr1_0.user_id 
+    left join
+        tasks t1_0 
+            on t1_0.id=utr1_0.task_id 
+    where
+        u1_0.id=? 
+        and t1_0.id=?
+2025-09-13T17:14:58.891+08:00  INFO 14172 --- [io-8080-exec-10] c.e.taskplanning.service.TaskService     : updateUserTaskRelation before: taskId=21 relationId=21 personalDeadline=2025-10-08T23:59 status=TODO
+2025-09-13T17:14:58.891+08:00  INFO 14172 --- [io-8080-exec-10] c.e.taskplanning.service.TaskService     : updateUserTaskRelation after: taskId=21 relationId=21 personalDeadline=2025-10-08T23:59 status=TODO
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.avatar_url,
+        u1_0.created_at,
+        u1_0.email,
+        u1_0.email_verified,
+        u1_0.language,
+        u1_0.last_login_at,
+        u1_0.name,
+        u1_0.notification_settings,
+        u1_0.password,
+        u1_0.phone,
+        u1_0.updated_at,
+        u1_0.username 
+    from
+        users u1_0 
+    where
+        u1_0.id=?
+Hibernate: 
+    select
+        c1_0.id,
+        c1_0.created_at,
+        c1_0.description,
+        c1_0.invite_code,
+        c1_0.is_public,
+        c1_0.join_approval,
+        c1_0.name,
+        c1_0.owner_id,
+        c1_0.status,
+        c1_0.updated_at 
+    from
+        classes c1_0 
+    where
+        c1_0.id=?
+2025-09-13T17:14:58.896+08:00  INFO 14172 --- [io-8080-exec-10] c.e.t.controller.TaskController          : updateTaskStatus completed for taskId=21, returned personalDeadline=2025-10-08T23:59
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.avatar_url,
+        u1_0.created_at,
+        u1_0.email,
+        u1_0.email_verified,
+        u1_0.language,
+        u1_0.last_login_at,
+        u1_0.name,
+        u1_0.notification_settings,
+        u1_0.password,
+        u1_0.phone,
+        u1_0.updated_at,
+        u1_0.username 
+    from
+        users u1_0 
+    where
+        u1_0.username=?
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.avatar_url,
+        u1_0.created_at,
+        u1_0.email,
+        u1_0.email_verified,
+        u1_0.language,
+        u1_0.last_login_at,
+        u1_0.name,
+        u1_0.notification_settings,
+        u1_0.password,
+        u1_0.phone,
+        u1_0.updated_at,
+        u1_0.username 
+    from
+        users u1_0 
+    where
+        u1_0.username=?
+Hibernate: 
+    select
+        distinct t1_0.id,
+        t1_0.class_id,
+        t1_0.course_name,
+        t1_0.created_at,
+        t1_0.creator_id,
+        t1_0.deadline,
+        t1_0.description,
+        t1_0.is_deleted,
+        t1_0.task_type,
+        t1_0.title,
+        t1_0.updated_at 
+    from
+        tasks t1_0 
+    where
+        t1_0.is_deleted=0 
+        and (
+            (
+                t1_0.task_type='PERSONAL' 
+                and t1_0.creator_id=?
+            ) 
+            or (
+                t1_0.task_type='CLASS' 
+                and exists(select
+                    1 
+                from
+                    user_task_relations utr1_0 
+                where
+                    utr1_0.task_id=t1_0.id 
+                    and utr1_0.user_id=?)
+            )
+        ) 
+        and (
+            (
+                t1_0.created_at between ? and ?
+            ) 
+            or (
+                t1_0.deadline between ? and ?
+            )
+        ) 
+    order by
+        t1_0.deadline
+Hibernate: 
+    select
+        utr1_0.id,
+        utr1_0.completed_at,
+        utr1_0.created_at,
+        utr1_0.personal_deadline,
+        utr1_0.personal_notes,
+        utr1_0.status,
+        utr1_0.task_id,
+        utr1_0.updated_at,
+        utr1_0.user_id 
+    from
+        user_task_relations utr1_0 
+    left join
+        users u1_0 
+            on u1_0.id=utr1_0.user_id 
+    where
+        u1_0.id=?
+Hibernate: 
+    select
+        c1_0.id,
+        c1_0.created_at,
+        c1_0.description,
+        c1_0.invite_code,
+        c1_0.is_public,
+        c1_0.join_approval,
+        c1_0.name,
+        c1_0.owner_id,
+        c1_0.status,
+        c1_0.updated_at 
+    from
+        classes c1_0 
+    where
+        c1_0.id=?
